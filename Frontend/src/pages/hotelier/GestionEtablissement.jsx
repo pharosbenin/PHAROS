@@ -1,0 +1,293 @@
+import { useState, useEffect } from 'react'
+import { Save, MapPin, Phone, Mail, Globe, Wifi, ParkingSquare, Utensils, Dumbbell, Wind, Waves, Upload, X, CheckCircle, Loader, AlertCircle } from 'lucide-react'
+import toast from 'react-hot-toast'
+import SidebarHotelier from '../../components/common/SidebarHotelier'
+import api from '../../services/api'
+
+const resolverUrl = url => {
+  if (!url) return ''
+  if (url.startsWith('blob:') || url.startsWith('http')) return url
+  return `http://localhost:8000${url}`
+}
+
+const EQUIPEMENTS_LISTE = [
+  { id: 'wifi', label: 'WiFi gratuit', icon: Wifi },
+  { id: 'parking', label: 'Parking', icon: ParkingSquare },
+  { id: 'restaurant', label: 'Restaurant', icon: Utensils },
+  { id: 'salle_sport', label: 'Salle de sport', icon: Dumbbell },
+  { id: 'climatisation', label: 'Climatisation', icon: Wind },
+  { id: 'piscine', label: 'Piscine', icon: Waves },
+]
+
+const VILLES = ['Cotonou', 'Porto-Novo', 'Parakou', 'Abomey-Calavi', 'Djougou', 'Bohicon', 'Kandi', 'Lokossa', 'Ouidah', 'Natitingou', 'Dassa-Zoumè', 'Abomey', 'Nikki', 'Malanville']
+
+export default function GestionEtablissement() {
+  const [hotelId, setHotelId] = useState(null)
+  const [form, setForm] = useState({ nom: '', description: '', ville: '', adresse: '', quartier: '', telephone: '', email: '', site_web: '' })
+  const [chargement, setChargement] = useState(true)
+  const [sauvegarde, setSauvegarde] = useState(false)
+  const [erreur, setErreur] = useState(null)
+  const [enCours, setEnCours] = useState(false)
+  const [onglet, setOnglet] = useState('infos')
+  const [photos, setPhotos] = useState([])
+  // photos : [{ id: number|null, url: string, uploading?: boolean, tempId?: string }]
+
+  useEffect(() => {
+    async function charger() {
+      try {
+        const liste = await api.get('/gestionnaire/hotels/')
+        const premier = liste.data[0]
+        if (!premier) return
+        // Charger le détail complet (inclut description, email, site_web, quartier)
+        const detail = await api.get(`/gestionnaire/hotels/${premier.id}/`)
+        const h = detail.data
+        setHotelId(h.id)
+        setForm({
+          nom: h.nom || '',
+          description: h.description || '',
+          ville: h.ville || '',
+          adresse: h.adresse || '',
+          quartier: h.quartier || '',
+          telephone: h.telephone || '',
+          email: h.email || '',
+          site_web: h.site_web || '',
+        })
+        // Charger toutes les photos depuis PhotoHotel
+        if (h.photos && h.photos.length > 0) {
+          setPhotos(h.photos.map(p => ({ id: p.id, url: p.image })))
+        } else if (h.photo_principale) {
+          // Fallback sur photo_principale si aucune PhotoHotel
+          setPhotos([{ id: null, url: h.photo_principale }])
+        }
+      } catch (err) {
+        console.error('Erreur chargement établissement', err)
+      } finally {
+        setChargement(false)
+      }
+    }
+    charger()
+  }, [])
+
+  const setChamp = (k, v) => setForm(p => ({ ...p, [k]: v }))
+
+  const uploadPhoto = async (file) => {
+    const tempId = `temp-${Date.now()}`
+    const tempUrl = URL.createObjectURL(file)
+    setPhotos(p => [...p, { id: null, url: tempUrl, uploading: true, tempId }])
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await api.post(`/gestionnaire/hotels/${hotelId}/photos/`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      setPhotos(p => p.map(ph => ph.tempId === tempId
+        ? { id: res.data.id, url: res.data.image }
+        : ph
+      ))
+      toast.success('Photo ajoutée !')
+    } catch (err) {
+      setPhotos(p => p.filter(ph => ph.tempId !== tempId))
+      toast.error(err.response?.data?.detail || "Échec de l'upload")
+    }
+  }
+
+  const supprimerPhoto = async (photo, index) => {
+    if (photo.id) {
+      try {
+        await api.delete(`/gestionnaire/hotels/${hotelId}/photos/${photo.id}/`)
+        setPhotos(p => p.filter((_, j) => j !== index))
+        toast.success('Photo supprimée')
+      } catch {
+        toast.error('Impossible de supprimer la photo')
+      }
+    } else {
+      setPhotos(p => p.filter((_, j) => j !== index))
+    }
+  }
+
+  const sauvegarder = async () => {
+    if (!form.nom || !form.ville) return
+    setEnCours(true)
+    setErreur(null)
+    try {
+      await api.patch(`/gestionnaire/hotels/${hotelId}/`, {
+        nom: form.nom,
+        description: form.description,
+        ville: form.ville,
+        adresse: form.adresse,
+        quartier: form.quartier,
+        telephone: form.telephone,
+        email: form.email,
+        site_web: form.site_web,
+      })
+      setSauvegarde(true)
+      setTimeout(() => setSauvegarde(false), 3000)
+    } catch (err) {
+      setErreur(err.response?.data ? JSON.stringify(err.response.data) : 'Erreur serveur')
+    } finally {
+      setEnCours(false)
+    }
+  }
+
+  if (chargement) return (
+    <div className="flex min-h-screen bg-gray-50">
+      <SidebarHotelier />
+      <div className="flex-1 flex items-center justify-center"><Loader size={32} className="animate-spin text-blue-500" /></div>
+    </div>
+  )
+
+  return (
+    <div className="flex min-h-screen bg-gray-50">
+      <SidebarHotelier />
+      <div className="flex-1 min-w-0 p-6 lg:p-8">
+        <div className="max-w-3xl">
+
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Mon établissement</h1>
+              <p className="text-gray-400 text-sm mt-0.5">Gérez les informations de votre hôtel</p>
+            </div>
+            <button onClick={sauvegarder} disabled={enCours}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all ${sauvegarde ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-200'}`}>
+              {enCours ? <Loader size={16} className="animate-spin" /> : sauvegarde ? <CheckCircle size={16} /> : <Save size={16} />}
+              {sauvegarde ? 'Sauvegardé' : 'Sauvegarder'}
+            </button>
+          </div>
+
+          {erreur && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5 text-sm text-red-700">
+              <AlertCircle size={16} className="shrink-0 mt-0.5" /> {erreur}
+            </div>
+          )}
+
+          <div className="flex bg-gray-100 rounded-xl p-1 mb-6 w-fit">
+            {[{ id: 'infos', label: 'Informations' }, { id: 'photos', label: 'Photos' }].map(o => (
+              <button key={o.id} onClick={() => setOnglet(o.id)}
+                className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${onglet === o.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
+                {o.label}
+              </button>
+            ))}
+          </div>
+
+          {onglet === 'infos' && (
+            <div className="space-y-5">
+              <div className="bg-white rounded-2xl border border-gray-100 p-6">
+                <h2 className="font-bold text-gray-900 mb-5">Identité de l'établissement</h2>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs text-gray-500 font-medium block mb-1.5">Nom de l'établissement *</label>
+                    <input type="text" value={form.nom} onChange={e => setChamp('nom', e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 font-medium block mb-1.5">Description</label>
+                    <textarea value={form.description} onChange={e => setChamp('description', e.target.value)}
+                      rows={4} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 resize-none" />
+                    <p className="text-xs text-gray-300 text-right mt-1">{form.description.length}/500</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 p-6">
+                <h2 className="font-bold text-gray-900 mb-5 flex items-center gap-2"><MapPin size={16} className="text-blue-500" /> Localisation</h2>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-gray-500 font-medium block mb-1.5">Ville *</label>
+                      <select value={form.ville} onChange={e => setChamp('ville', e.target.value)}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400">
+                        <option value="">-- Sélectionner --</option>
+                        {VILLES.map(v => <option key={v} value={v}>{v}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 font-medium block mb-1.5">Quartier</label>
+                      <input type="text" value={form.quartier} onChange={e => setChamp('quartier', e.target.value)}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 font-medium block mb-1.5">Adresse complète</label>
+                    <input type="text" value={form.adresse} onChange={e => setChamp('adresse', e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400" />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 p-6">
+                <h2 className="font-bold text-gray-900 mb-5">Contacts</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[
+                    { champ: 'telephone', label: 'Téléphone', icon: Phone, placeholder: '+229 XX XX XX XX', type: 'tel' },
+                    { champ: 'email', label: 'Email', icon: Mail, placeholder: 'contact@hotel.bj', type: 'email' },
+                    { champ: 'site_web', label: 'Site web', icon: Globe, placeholder: 'https://hotel.bj', type: 'text' },
+                  ].map(c => (
+                    <div key={c.champ}>
+                      <label className="text-xs text-gray-500 font-medium block mb-1.5">{c.label}</label>
+                      <div className="relative">
+                        <c.icon size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input type={c.type} value={form[c.champ]} onChange={e => setChamp(c.champ, e.target.value)}
+                          placeholder={c.placeholder}
+                          className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:border-blue-400" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {onglet === 'photos' && (
+            <div className="bg-white rounded-2xl border border-gray-100 p-6">
+              <h2 className="font-bold text-gray-900 mb-2">Photos de l'établissement</h2>
+              <p className="text-xs text-gray-400 mb-5">Ajoutez jusqu'à 10 photos. La première sera utilisée comme photo principale.</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                {photos.map((photo, i) => (
+                  <div key={photo.tempId || photo.id || i} className="relative aspect-video bg-gray-100 rounded-xl overflow-hidden">
+                    <img src={resolverUrl(photo.url)} alt={`Photo ${i + 1}`} className="w-full h-full object-cover" />
+                    {i === 0 && <span className="absolute top-2 left-2 bg-blue-600 text-white text-xs px-2 py-0.5 rounded-full font-medium">Principale</span>}
+                    {photo.uploading ? (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                        <Loader size={20} className="animate-spin text-white" />
+                      </div>
+                    ) : (
+                      <button onClick={() => supprimerPhoto(photo, i)}
+                        className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600">
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {photos.length < 10 && (
+                  <label className="aspect-video border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-colors group">
+                    <Upload size={24} className="text-gray-300 group-hover:text-blue-400 mb-2" />
+                    <p className="text-xs text-gray-400 group-hover:text-blue-500 text-center">Ajouter une photo</p>
+                    <input type="file" accept="image/*" className="hidden"
+                      onChange={e => {
+                        const file = e.target.files[0]
+                        if (file) uploadPhoto(file)
+                        e.target.value = ''
+                      }} />
+                  </label>
+                )}
+              </div>
+              {photos.length === 0 && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
+                  Aucune photo ajoutée. Un établissement avec des photos attire 3× plus de réservations.
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end mt-6">
+            <button onClick={sauvegarder} disabled={enCours}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${sauvegarde ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-200'}`}>
+              {enCours ? <Loader size={16} className="animate-spin" /> : sauvegarde ? <CheckCircle size={16} /> : <Save size={16} />}
+              {sauvegarde ? 'Sauvegardé !' : 'Sauvegarder les modifications'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

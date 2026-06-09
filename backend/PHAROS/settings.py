@@ -1,21 +1,12 @@
 from pathlib import Path
 from datetime import timedelta
 
-# =============================================================
-# CHEMINS DE BASE
-# =============================================================
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# =============================================================
-# SÉCURITÉ
-# =============================================================
-SECRET_KEY = 'django-insecure-transcargo-bj-2026-change-en-production'
+SECRET_KEY = 'django-insecure-pharos-2026-change-en-production'
 DEBUG = True
 ALLOWED_HOSTS = ['*']
 
-# =============================================================
-# APPLICATIONS INSTALLÉES
-# =============================================================
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -31,21 +22,15 @@ INSTALLED_APPS = [
 
     # Nos applications
     'accounts',
-    'demandes',
-    'offres',
-    'livraisons',
-    'paiements',
-    'evaluations',
-    'notifications',
-    'litiges',
-    'negociations',
+    'hotels',
+    'reservations',
+    'avis',
+    'commissions',
+    'evenements',
 ]
 
-# =============================================================
-# MIDDLEWARES
-# =============================================================
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # CORS en premier
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -55,7 +40,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'Benin_Transport.urls'
+ROOT_URLCONF = 'PHAROS.urls'
 
 TEMPLATES = [
     {
@@ -73,15 +58,12 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'Benin_Transport.wsgi.application'
+WSGI_APPLICATION = 'PHAROS.wsgi.application'
 
-# =============================================================
-# BASE DE DONNÉES — PostgreSQL
-# =============================================================
 DATABASES = {
- 'default': {
+    'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'transportbenin',
+        'NAME': 'pharos_db',
         'USER': 'postgres',
         'PASSWORD': 'admin123',
         'HOST': 'localhost',
@@ -92,14 +74,6 @@ DATABASES = {
     }
 }
 
-# =============================================================
-# AUTHENTIFICATION — Modèle utilisateur personnalisé
-# =============================================================
-AUTH_USER_MODEL = 'accounts.CustomUser'
-
-# =============================================================
-# DJANGO REST FRAMEWORK
-# =============================================================
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -109,40 +83,34 @@ REST_FRAMEWORK = {
     ),
 }
 
-# =============================================================
-# JWT — Configuration des tokens
-# =============================================================
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),   # expire après 30 min
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
     'AUTH_HEADER_TYPES': ('Bearer',),
 }
 
-# =============================================================
-# CORS — Autoriser le frontend React
-# =============================================================
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
-    "http://localhost:5173",
-    "http://localhost:5174",  # C'est pour la connexion avec react de prisodev
+    "http://localhost:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:5174",
+    "http://127.0.0.1:5175",
 ]
-# =============================================================
-# INTERNATIONALISATION
-# =============================================================
+
+CORS_ALLOW_CREDENTIALS = True
+
+AUTH_USER_MODEL = 'accounts.CustomUser'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 LANGUAGE_CODE = 'fr-fr'
-TIME_ZONE = 'Africa/Porto-Novo'  # fuseau horaire du Bénin
+TIME_ZONE = 'Africa/Porto-Novo'
 USE_I18N = True
 USE_TZ = True
 
-# =============================================================
-# FICHIERS STATIQUES ET MÉDIAS
-# =============================================================
 STATIC_URL = '/static/'
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'  # pour les documents uploadés (IFU, RCCM, etc.)
 
-# =============================================================
-# CLÉ PRIMAIRE PAR DÉFAUT
-# =============================================================
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

@@ -1,0 +1,260 @@
+import { useState, useEffect } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
+import { Search, MapPin, SlidersHorizontal, Grid3X3, List, X, Star, ChevronDown, Filter, Loader2 } from 'lucide-react'
+import Layout from '../../components/common/Layout'
+import CarteHotel from '../../components/common/CarteHotel'
+import api from '../../services/api'
+
+const VILLES_BENIN = [
+  'Cotonou', 'Porto-Novo', 'Parakou', 'Abomey-Calavi', 'Djougou',
+  'Bohicon', 'Kandi', 'Lokossa', 'Ouidah', 'Natitingou',
+  'Dassa-Zoumè', 'Abomey', 'Nikki', 'Malanville'
+]
+
+export default function Resultats() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
+
+  const [ville, setVille] = useState(searchParams.get('ville') || '')
+  const [dateArrivee, setDateArrivee] = useState(searchParams.get('arrivee') || '')
+  const [dateDepart, setDateDepart] = useState(searchParams.get('depart') || '')
+  const [voyageurs] = useState(searchParams.get('voyageurs') || 1)
+  const [tri, setTri] = useState('popularite')
+  const [vueGrille, setVueGrille] = useState(true)
+  const [filtresOuverts, setFiltresOuverts] = useState(false)
+  const [filtres, setFiltres] = useState({ equipements: [], type: '', etoilesMin: 0, restauration: false })
+  const [hotels, setHotels] = useState([])
+  const [chargement, setChargement] = useState(true)
+
+  const chargerHotels = () => {
+    setChargement(true)
+    const params = {}
+    if (ville) params.ville = ville
+    if (searchParams.get('q')) params.q = searchParams.get('q')
+    api.get('/hotels/', { params })
+      .then(res => {
+        let data = res.data.map(h => ({
+          ...h,
+          prix_min: h.types_chambres?.[0]?.prix_nuit ? parseFloat(h.types_chambres[0].prix_nuit) : null,
+          note_moyenne: parseFloat(h.note_moyenne) || 0,
+          nb_avis: h.nombre_avis || 0,
+          abonnement: h.type_abonnement,
+          localisation: h.quartier || h.adresse || '',
+          equipements: [],
+        }))
+        if (tri === 'prix_asc') data.sort((a, b) => (a.prix_min || 0) - (b.prix_min || 0))
+        else if (tri === 'prix_desc') data.sort((a, b) => (b.prix_min || 0) - (a.prix_min || 0))
+        else if (tri === 'note') data.sort((a, b) => (b.note_moyenne || 0) - (a.note_moyenne || 0))
+        setHotels(data)
+      })
+      .catch(() => setHotels([]))
+      .finally(() => setChargement(false))
+  }
+
+  useEffect(() => { chargerHotels() }, [ville, tri])
+
+  const toggleEquipement = (eq) => {
+    setFiltres(prev => ({
+      ...prev,
+      equipements: prev.equipements.includes(eq)
+        ? prev.equipements.filter(e => e !== eq)
+        : [...prev.equipements, eq]
+    }))
+  }
+
+  const nbFiltresActifs = filtres.equipements.length + (filtres.type ? 1 : 0) + (filtres.etoilesMin > 0 ? 1 : 0) + (filtres.restauration ? 1 : 0)
+
+  const reinitialiserFiltres = () => setFiltres({ equipements: [], type: '', etoilesMin: 0, restauration: false })
+
+  const PanneauFiltres = () => (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold text-gray-900">Filtres</h3>
+        {nbFiltresActifs > 0 && (
+          <button onClick={reinitialiserFiltres} className="text-xs text-blue-600 hover:underline font-medium">
+            Tout effacer ({nbFiltresActifs})
+          </button>
+        )}
+      </div>
+
+      {/* Type */}
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-2">Type d'établissement</p>
+        {[['hotel', 'Hôtel'], ['residence', 'Résidence'], ['villa', 'Villa'], ['auberge', 'Auberge']].map(([val, label]) => (
+          <label key={val} className="flex items-center gap-2 py-1.5 cursor-pointer group">
+            <input type="radio" name="type" value={val}
+              checked={filtres.type === val}
+              onChange={() => setFiltres(prev => ({ ...prev, type: prev.type === val ? '' : val }))}
+              className="text-blue-600 accent-blue-600" />
+            <span className="text-sm text-gray-600 group-hover:text-gray-900">{label}</span>
+          </label>
+        ))}
+      </div>
+
+      {/* Note minimale */}
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-2">Note minimale</p>
+        {[4.5, 4.0, 3.5, 3.0].map(n => (
+          <button key={n} onClick={() => setFiltres(prev => ({ ...prev, etoilesMin: prev.etoilesMin === n ? 0 : n }))}
+            className={`flex items-center gap-2 py-1.5 text-sm w-full text-left rounded-lg px-2 transition-colors ${filtres.etoilesMin === n ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50'}`}>
+            <div className="flex">
+              {[...Array(Math.floor(n))].map((_, i) => <Star key={i} size={12} className="text-amber-400 fill-amber-400" />)}
+            </div>
+            <span>{n}+</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Équipements */}
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-2">Équipements</p>
+        {[['wifi', 'WiFi'], ['parking', 'Parking'], ['restaurant', 'Restaurant'], ['piscine', 'Piscine']].map(([val, label]) => (
+          <label key={val} className="flex items-center gap-2 py-1.5 cursor-pointer group">
+            <input type="checkbox" checked={filtres.equipements.includes(val)}
+              onChange={() => toggleEquipement(val)} className="accent-blue-600 rounded" />
+            <span className="text-sm text-gray-600 group-hover:text-gray-900">{label}</span>
+          </label>
+        ))}
+      </div>
+
+      {/* Prix */}
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-2">Abonnement</p>
+        <label className="flex items-center gap-2 py-1.5 cursor-pointer">
+          <input type="checkbox"
+            checked={filtres.restauration}
+            onChange={() => setFiltres(prev => ({ ...prev, restauration: !prev.restauration }))}
+            className="accent-blue-600 rounded" />
+          <span className="text-sm text-gray-600">Partenaires certifiés uniquement</span>
+        </label>
+      </div>
+    </div>
+  )
+
+  return (
+    <Layout>
+      {/* Barre recherche */}
+      <div className="bg-white border-b border-gray-100 sticky top-16 z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-1 items-center gap-2 bg-gray-50 hover:bg-gray-100 rounded-xl px-4 py-2.5 transition-colors">
+              <MapPin size={16} className="text-blue-500 shrink-0" />
+              <select value={ville} onChange={(e) => setVille(e.target.value)}
+                className="flex-1 bg-transparent text-sm text-gray-700 outline-none font-medium">
+                <option value="">Toutes les villes</option>
+                {VILLES_BENIN.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </div>
+            <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-2.5 sm:w-40">
+              <input type="date" value={dateArrivee} onChange={e => setDateArrivee(e.target.value)}
+                className="bg-transparent text-sm text-gray-700 outline-none w-full" placeholder="Arrivée" />
+            </div>
+            <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-2.5 sm:w-40">
+              <input type="date" value={dateDepart} onChange={e => setDateDepart(e.target.value)}
+                className="bg-transparent text-sm text-gray-700 outline-none w-full" placeholder="Départ" />
+            </div>
+            <button
+              onClick={() => {
+                const p = new URLSearchParams()
+                if (ville) p.set('ville', ville)
+                if (dateArrivee) p.set('arrivee', dateArrivee)
+                if (dateDepart) p.set('depart', dateDepart)
+                p.set('voyageurs', voyageurs)
+                setSearchParams(p)
+              }}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-colors">
+              <Search size={16} />
+              Rechercher
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="flex gap-6">
+          {/* Filtres sidebar desktop */}
+          <aside className="hidden lg:block w-64 shrink-0">
+            <div className="bg-white rounded-2xl border border-gray-100 p-5 sticky top-36">
+              <PanneauFiltres />
+            </div>
+          </aside>
+
+          {/* Résultats */}
+          <div className="flex-1 min-w-0">
+            {/* En-tête résultats */}
+            <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+              <div>
+                <p className="text-gray-800 font-semibold">
+                  <span className="text-blue-600">{hotels.length}</span> hébergement{hotels.length > 1 ? 's' : ''} trouvé{hotels.length > 1 ? 's' : ''}
+                  {ville && <span className="text-gray-500 font-normal"> à {ville}</span>}
+                </p>
+                {dateArrivee && dateDepart && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {new Date(dateArrivee).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} → {new Date(dateDepart).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} · {voyageurs} voyageur{voyageurs > 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                <button onClick={() => setFiltresOuverts(!filtresOuverts)}
+                  className="lg:hidden flex items-center gap-2 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
+                  <Filter size={15} />
+                  Filtres {nbFiltresActifs > 0 && <span className="bg-blue-600 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center">{nbFiltresActifs}</span>}
+                </button>
+                <select value={tri} onChange={(e) => setTri(e.target.value)}
+                  className="bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 outline-none cursor-pointer">
+                  <option value="popularite">Popularité</option>
+                  <option value="prix_asc">Prix croissant</option>
+                  <option value="prix_desc">Prix décroissant</option>
+                  <option value="note">Meilleures notes</option>
+                </select>
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                  <button onClick={() => setVueGrille(true)}
+                    className={`p-1.5 rounded-md transition-colors ${vueGrille ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}>
+                    <Grid3X3 size={16} className="text-gray-600" />
+                  </button>
+                  <button onClick={() => setVueGrille(false)}
+                    className={`p-1.5 rounded-md transition-colors ${!vueGrille ? 'bg-white shadow-sm' : 'hover:bg-gray-200'}`}>
+                    <List size={16} className="text-gray-600" />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Filtres mobile */}
+            {filtresOuverts && (
+              <div className="lg:hidden bg-white rounded-2xl border border-gray-100 p-5 mb-5">
+                <PanneauFiltres />
+              </div>
+            )}
+
+            {chargement ? (
+              <div className="bg-white rounded-2xl p-12 text-center border border-gray-100">
+                <Loader2 size={40} className="text-blue-500 mx-auto mb-3 animate-spin" />
+                <p className="text-gray-500">Recherche en cours...</p>
+              </div>
+            ) : hotels.length === 0 ? (
+              <div className="bg-white rounded-2xl p-12 text-center border border-gray-100">
+                <Search size={48} className="text-gray-300 mx-auto mb-4" />
+                <h3 className="font-bold text-gray-900 text-lg mb-2">Aucun hébergement trouvé</h3>
+                <p className="text-gray-500 text-sm">Essayez avec une autre ville ou modifiez vos filtres.</p>
+                <button onClick={reinitialiserFiltres}
+                  className="mt-4 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition-colors">
+                  Réinitialiser les filtres
+                </button>
+              </div>
+            ) : (
+              <div className={vueGrille
+                ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5'
+                : 'space-y-4'
+              }>
+                {hotels.map(hotel => (
+                  <CarteHotel key={hotel.id} hotel={hotel} vue={vueGrille ? 'grille' : 'liste'} />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </Layout>
+  )
+}
