@@ -1,0 +1,9 @@
+backend/media/
+image/
+**/__pycache__/
+**/*.pyc
+.env
+.env.local
+.env.production
+node_modules/
+dist/
