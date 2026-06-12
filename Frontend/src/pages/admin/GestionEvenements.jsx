@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
+import usePolling from '../../hooks/usePolling'
 import { CalendarDays, Plus, Edit2, Trash2, MapPin, Clock, Star, X, Save, Calendar, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
 import SidebarAdmin from '../../components/common/SidebarAdmin'
 import api from '../../services/api'
 
-const VILLES_BENIN = ['Cotonou', 'Porto-Novo', 'Parakou', 'Abomey-Calavi', 'Ouidah', 'Dassa-Zoumè', 'Bohicon', 'Natitingou', 'Lokossa', 'Abomey', 'Kandi']
 
 const FORM_VIDE = {
   nom: '', region: '', date_debut: '', date_fin: '',
@@ -14,11 +14,13 @@ const FORM_VIDE = {
 export default function GestionEvenements() {
   const [evenements, setEvenements] = useState([])
   const [chargement, setChargement] = useState(true)
-  const [modal, setModal] = useState(null) // null | 'nouveau' | { ...evenement }
+  const [modal, setModal] = useState(null)
   const [form, setForm] = useState(FORM_VIDE)
   const [sauvegarde, setSauvegarde] = useState(false)
   const [confirmerSuppression, setConfirmerSuppression] = useState(null)
   const [suppression, setSuppression] = useState(false)
+  const [villesDisponibles, setVillesDisponibles] = useState([])
+  const [villeLibre, setVilleLibre] = useState('')
 
   const charger = () => {
     setChargement(true)
@@ -28,7 +30,10 @@ export default function GestionEvenements() {
       .finally(() => setChargement(false))
   }
 
-  useEffect(() => { charger() }, [])
+  usePolling(charger, 30000)
+  useEffect(() => {
+    api.get('/hotels/villes/').then(res => setVillesDisponibles(res.data || [])).catch(() => {})
+  }, [])
 
   const ouvrir = (evt = null) => {
     if (evt) {
@@ -296,15 +301,64 @@ export default function GestionEvenements() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-semibold text-gray-600 mb-2 block">Villes concernées (hôtels PRO mis en avant)</label>
-                  <div className="flex flex-wrap gap-2">
-                    {VILLES_BENIN.map(v => (
-                      <button key={v} type="button" onClick={() => toggleVille(v)}
-                        className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${form.villes_concernees.includes(v) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
-                        {v}
-                      </button>
-                    ))}
+                  <label className="text-xs font-semibold text-gray-600 mb-2 block">
+                    Villes concernées (hôtels PRO mis en avant)
+                  </label>
+
+                  {/* Champ libre pour toute ville béninoise */}
+                  <div className="flex gap-2 mb-3">
+                    <input
+                      type="text"
+                      value={villeLibre}
+                      onChange={e => setVilleLibre(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && villeLibre.trim()) {
+                          e.preventDefault()
+                          const v = villeLibre.trim()
+                          if (!form.villes_concernees.includes(v)) toggleVille(v)
+                          setVilleLibre('')
+                        }
+                      }}
+                      placeholder="Saisir une ville (ex: Nikki, Kétou…) et appuyer Entrée"
+                      className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const v = villeLibre.trim()
+                        if (v && !form.villes_concernees.includes(v)) toggleVille(v)
+                        setVilleLibre('')
+                      }}
+                      className="bg-blue-600 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-blue-700 transition-colors"
+                    >
+                      Ajouter
+                    </button>
                   </div>
+
+                  {/* Villes existantes issues des hôtels */}
+                  {villesDisponibles.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {villesDisponibles.map(v => (
+                        <button key={v} type="button" onClick={() => toggleVille(v)}
+                          className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-all ${form.villes_concernees.includes(v) ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300'}`}>
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Villes sélectionnées */}
+                  {form.villes_concernees.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {form.villes_concernees.map(v => (
+                        <span key={v} className="flex items-center gap-1 text-xs bg-blue-600 text-white px-2.5 py-1 rounded-full font-medium">
+                          {v}
+                          <button type="button" onClick={() => toggleVille(v)} className="hover:text-blue-200">×</button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
                 </div>
 
                 <label className="flex items-center gap-2 cursor-pointer">

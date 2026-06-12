@@ -32,6 +32,7 @@ export default function Footer() {
               <li><Link to="/recherche" className="text-sm hover:text-white transition-colors">Rechercher un hôtel</Link></li>
               <li><Link to="/connexion" className="text-sm hover:text-white transition-colors">Se connecter</Link></li>
               <li><Link to="/connexion?type=hotelier" className="text-sm hover:text-white transition-colors">Inscrire mon hôtel</Link></li>
+              <li><Link to="/regles" className="text-sm text-[#F57C2B] hover:text-orange-400 transition-colors font-medium">Règles de la plateforme</Link></li>
             </ul>
           </div>
 
@@ -69,7 +70,7 @@ export default function Footer() {
         <div className="border-t border-gray-800 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
           <p>© 2026 PHAROS BÉNIN. Tous droits réservés.</p>
           <div className="flex items-center gap-4">
-            <a href="#" className="hover:text-white transition-colors">Conditions d'utilisation</a>
+            <Link to="/regles" className="hover:text-white transition-colors">Conditions d'utilisation</Link>
             <a href="#" className="hover:text-white transition-colors">Politique de confidentialité</a>
           </div>
         </div>

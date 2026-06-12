@@ -5,10 +5,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.permissions import EstAdmin, EstGestionnaire, EstClient, EstNonSuspendu, EstHotelValide
-from .models import Avis, SignalementAvis
+from .models import Avis, SignalementAvis, SignalementContenu, SignalementHotel
 from .serializers import (
     AvisSerializer, AvisCreerSerializer, RepondreAvisSerializer,
-    SignalementSerializer, SignalementDetailSerializer
+    SignalementSerializer, SignalementDetailSerializer,
+    SignalementContenuSerializer, SignalementContenuAdminSerializer,
+    SignalementHotelSerializer, SignalementHotelAdminSerializer,
 )
 
 
@@ -42,6 +44,19 @@ def repondre_avis(request, pk):
         avis.date_reponse = timezone.now()
         avis.save(update_fields=['reponse_gestionnaire', 'date_reponse'])
         return Response(AvisSerializer(avis).data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, EstClient, EstNonSuspendu])
+def creer_signalement_contenu(request):
+    serializer = SignalementContenuSerializer(data=request.data, context={'request': request})
+    if serializer.is_valid():
+        serializer.save()
+        return Response(
+            {'detail': 'Votre commentaire a été transmis pour modération. Merci pour votre retour.'},
+            status=status.HTTP_201_CREATED
+        )
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -108,6 +123,52 @@ def supprimer_avis(request, pk):
     avis.delete()
     hotel.recalculer_note()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, EstClient, EstNonSuspendu])
+def creer_signalement_hotel(request):
+    serializer = SignalementHotelSerializer(data=request.data, context={'request': request})
+    if serializer.is_valid():
+        serializer.save()
+        return Response({'detail': 'Votre signalement a été transmis à notre équipe.'}, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class SignalementsContenuAdmin(generics.ListAPIView):
+    serializer_class = SignalementContenuAdminSerializer
+    permission_classes = [IsAuthenticated, EstAdmin]
+    queryset = SignalementContenu.objects.filter(statut='en_attente').select_related('client', 'hotel')
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, EstAdmin])
+def traiter_signalement_contenu(request, pk):
+    try:
+        s = SignalementContenu.objects.get(pk=pk)
+    except SignalementContenu.DoesNotExist:
+        return Response({'detail': 'Signalement introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+    s.statut = 'traite'
+    s.save(update_fields=['statut'])
+    return Response({'message': 'Signalement traité.'})
+
+
+class SignalementsHotelAdmin(generics.ListAPIView):
+    serializer_class = SignalementHotelAdminSerializer
+    permission_classes = [IsAuthenticated, EstAdmin]
+    queryset = SignalementHotel.objects.filter(statut='en_attente').select_related('client', 'hotel')
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated, EstAdmin])
+def traiter_signalement_hotel(request, pk):
+    try:
+        s = SignalementHotel.objects.get(pk=pk)
+    except SignalementHotel.DoesNotExist:
+        return Response({'detail': 'Signalement introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+    s.statut = 'traite'
+    s.save(update_fields=['statut'])
+    return Response({'message': 'Signalement traité.'})
 
 
 class SignalementsAdmin(generics.ListAPIView):

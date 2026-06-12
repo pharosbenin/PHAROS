@@ -10,6 +10,7 @@ export default function Confirmation() {
   // Nouveau format : { reservation (objet backend), methodeLabel }
   const res = state?.reservation
   const methodeLabel = state?.methodeLabel || state?.methode || 'Mobile Money'
+  const transactionId = state?.transactionId
 
   // Champs normalisés — supporte aussi l'ancien format pour la rétrocompatibilité
   const numReservation = res?.numero || reservationId || 'RES-PHAROS'
@@ -138,6 +139,11 @@ export default function Confirmation() {
             <p className="text-xs text-gray-400">
               Payé via {methodeLabel} · Fonds sécurisés par Escrow PHAROS
             </p>
+            {transactionId && (
+              <p className="text-xs text-gray-400 font-mono mt-0.5">
+                Réf. FedaPay : <span className="font-semibold">{transactionId}</span>
+              </p>
+            )}
           </div>
         </div>
 

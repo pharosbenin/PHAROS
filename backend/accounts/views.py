@@ -6,11 +6,12 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import CustomUser
+from .models import CustomUser, Notification, MessageContact, OTPVerification
 from .permissions import EstAdmin, EstNonSuspendu
 from .serializers import (
     InscriptionSerializer, ProfilSerializer, ModifierProfilSerializer,
     ChangerMotDePasseSerializer, UtilisateurAdminSerializer,
+    MessageContactSerializer,
 )
 
 
@@ -83,6 +84,82 @@ def changer_mot_de_passe(request):
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# --- OTP ---
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def envoyer_otp(request):
+    import random
+    from django.utils import timezone
+    from datetime import timedelta
+    from django.conf import settings
+
+    telephone = request.data.get('telephone', '').strip()
+    if not telephone:
+        return Response({'detail': 'Numéro de téléphone requis.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Invalider les anciens OTP non utilisés pour ce numéro
+    OTPVerification.objects.filter(telephone=telephone, is_used=False).update(is_used=True)
+
+    # Générer un code à 6 chiffres
+    code = str(random.randint(100000, 999999))
+    expires_at = timezone.now() + timedelta(minutes=5)
+    OTPVerification.objects.create(telephone=telephone, code=code, expires_at=expires_at)
+
+    # Envoyer le SMS via Africa's Talking
+    at_username = getattr(settings, 'AT_USERNAME', None)
+    at_api_key = getattr(settings, 'AT_API_KEY', None)
+    dev_code = None
+    if at_username and at_api_key:
+        try:
+            import africastalking
+            africastalking.initialize(at_username, at_api_key)
+            sms = africastalking.SMS
+            sms.send(
+                f"PHAROS BÉNIN - Votre code de vérification : {code}. Valable 5 minutes. Ne le partagez pas.",
+                [telephone]
+            )
+        except Exception as e:
+            print(f"[OTP] Erreur SMS: {e}")
+            dev_code = code
+    else:
+        # Mode simulation : renvoyer le code pour auto-remplissage
+        dev_code = code
+        print(f"[OTP DEV] Code pour {telephone} : {code}")
+
+    response_data = {'message': 'Code OTP envoyé avec succès.'}
+    if dev_code:
+        response_data['dev_code'] = dev_code
+    return Response(response_data)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def verifier_otp(request):
+    telephone = request.data.get('telephone', '').strip()
+    code = request.data.get('code', '').strip()
+
+    if not telephone or not code:
+        return Response({'detail': 'Téléphone et code requis.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    otp = OTPVerification.objects.filter(
+        telephone=telephone,
+        code=code,
+        is_used=False
+    ).order_by('-created_at').first()
+
+    if not otp:
+        return Response({'detail': 'Code incorrect. Vérifiez et réessayez.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not otp.is_valid():
+        return Response({'detail': 'Code expiré. Demandez un nouveau code.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    otp.is_used = True
+    otp.save(update_fields=['is_used'])
+
+    return Response({'message': 'Numéro vérifié avec succès.', 'verified': True})
+
+
 # --- Vues Admin ---
 
 class ListeUtilisateurs(generics.ListAPIView):
@@ -109,3 +186,64 @@ def suspendre_utilisateur(request, pk):
     user.save()
     action = 'suspendu' if user.est_suspendu else 'réactivé'
     return Response({'message': f'Compte {action} avec succès.', 'est_suspendu': user.est_suspendu})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def mes_notifications(request):
+    notifs = Notification.objects.filter(destinataire=request.user)
+    data = [{
+        'id': n.id,
+        'type': n.type,
+        'titre': n.titre,
+        'message': n.message,
+        'lu': n.lu,
+        'reservation_numero': n.reservation_numero,
+        'date_creation': n.date_creation.isoformat(),
+    } for n in notifs]
+    return Response(data)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def marquer_notif_lue(request, pk):
+    try:
+        notif = Notification.objects.get(pk=pk, destinataire=request.user)
+    except Notification.DoesNotExist:
+        return Response({'detail': 'Introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+    notif.lu = True
+    notif.save(update_fields=['lu'])
+    return Response({'lu': True})
+
+
+# --- Messages de contact ---
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def envoyer_message_contact(request):
+    serializer = MessageContactSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response({'message': 'Message envoyé avec succès.'}, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated, EstAdmin])
+def liste_messages_contact(request):
+    messages_qs = MessageContact.objects.all()
+    serializer = MessageContactSerializer(messages_qs, many=True)
+    non_lus = MessageContact.objects.filter(lu=False).count()
+    return Response({'messages': serializer.data, 'non_lus': non_lus})
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated, EstAdmin])
+def marquer_message_contact_lu(request, pk):
+    try:
+        msg = MessageContact.objects.get(pk=pk)
+    except MessageContact.DoesNotExist:
+        return Response({'detail': 'Message introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+    msg.lu = True
+    msg.save(update_fields=['lu'])
+    return Response({'lu': True})

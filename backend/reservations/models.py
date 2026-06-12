@@ -38,6 +38,7 @@ class Reservation(models.Model):
     prix_total = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0)])
     statut = models.CharField(max_length=20, choices=STATUTS, default='en_attente')
     notes = models.TextField(blank=True)
+    avis_disponible = models.BooleanField(default=False)
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)
 
@@ -124,6 +125,8 @@ class Annulation(models.Model):
     motif = models.TextField()
     statut = models.CharField(max_length=20, choices=STATUTS, default='en_attente')
     montant_rembourse = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    frais_annulation = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    commission_plateforme = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     date_demande = models.DateTimeField(auto_now_add=True)
     date_traitement = models.DateTimeField(null=True, blank=True)
 
@@ -132,3 +135,32 @@ class Annulation(models.Model):
 
     def __str__(self):
         return f"Annulation {self.reservation.numero}"
+
+
+class Modification(models.Model):
+    SENS = [('hausse', 'Hausse'), ('baisse', 'Baisse')]
+
+    reservation = models.ForeignKey(Reservation, on_delete=models.CASCADE, related_name='modifications')
+    demandeur = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    type_chambre_ancien = models.ForeignKey(
+        'hotels.TypeChambre', on_delete=models.PROTECT, related_name='+'
+    )
+    type_chambre_nouveau = models.ForeignKey(
+        'hotels.TypeChambre', on_delete=models.PROTECT, related_name='+'
+    )
+    sens = models.CharField(max_length=10, choices=SENS, default='baisse')
+    prix_ancien = models.DecimalField(max_digits=12, decimal_places=2)
+    prix_nouveau = models.DecimalField(max_digits=12, decimal_places=2)
+    difference = models.DecimalField(max_digits=12, decimal_places=2)
+    frais_modification = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    commission_plateforme = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    montant_rembourse = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    montant_supplementaire = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    date_demande = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Modification'
+        ordering = ['-date_demande']
+
+    def __str__(self):
+        return f"Modification {self.reservation.numero}"

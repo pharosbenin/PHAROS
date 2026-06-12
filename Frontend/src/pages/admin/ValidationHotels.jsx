@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Search, CheckCircle, XCircle, Clock, Phone, MapPin, ChevronDown, ChevronUp, Building2, Loader, FileText } from 'lucide-react'
 import toast from 'react-hot-toast'
 import SidebarAdmin from '../../components/common/SidebarAdmin'
 import api from '../../services/api'
+import usePolling from '../../hooks/usePolling'
 
 const STATUT = {
   en_attente: { label: 'En attente', cls: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
@@ -29,7 +30,7 @@ export default function ValidationHotels() {
       .finally(() => setChargement(false))
   }
 
-  useEffect(() => { charger() }, [])
+  usePolling(charger, 30000)
 
   const hotelsFiltres = hotels.filter(h => {
     const matchStatut = filtre === 'tous' || h.statut === filtre

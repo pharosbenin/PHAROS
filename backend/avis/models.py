@@ -37,6 +37,63 @@ class Avis(models.Model):
         self.hotel.recalculer_note()
 
 
+class SignalementContenu(models.Model):
+    """Avis contenant des mots interdits détectés côté client — en attente de modération."""
+    STATUTS = [
+        ('en_attente', 'En attente'),
+        ('traite', 'Traité'),
+    ]
+
+    reservation = models.ForeignKey(
+        'reservations.Reservation', on_delete=models.CASCADE,
+        related_name='signalements_contenu'
+    )
+    client = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, related_name='signalements_contenu'
+    )
+    hotel = models.ForeignKey(
+        'hotels.Hotel', on_delete=models.CASCADE,
+        related_name='signalements_contenu'
+    )
+    avis_initial = models.TextField()
+    explication = models.TextField()
+    date_signalement = models.DateTimeField(auto_now_add=True)
+    statut = models.CharField(max_length=20, choices=STATUTS, default='en_attente')
+
+    class Meta:
+        ordering = ['-date_signalement']
+        verbose_name = 'Signalement de contenu'
+
+    def __str__(self):
+        return f"Signalement — {self.reservation}"
+
+
+class SignalementHotel(models.Model):
+    MOTIFS = [
+        ('tromperie', 'Informations trompeuses'),
+        ('hygiene', "Problème d'hygiène"),
+        ('securite', 'Problème de sécurité'),
+        ('escroquerie', 'Escroquerie'),
+        ('autre', 'Autre'),
+    ]
+    STATUTS = [('en_attente', 'En attente'), ('traite', 'Traité')]
+
+    client = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name='signalements_hotel')
+    hotel = models.ForeignKey('hotels.Hotel', on_delete=models.CASCADE, related_name='signalements_hotel')
+    motif = models.CharField(max_length=20, choices=MOTIFS)
+    description = models.TextField()
+    statut = models.CharField(max_length=20, choices=STATUTS, default='en_attente')
+    date_signalement = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date_signalement']
+        verbose_name = "Signalement d'hôtel"
+
+    def __str__(self):
+        return f"Signalement hôtel — {self.hotel.nom}"
+
+
 class SignalementAvis(models.Model):
     MOTIFS = [
         ('spam', 'Spam'),

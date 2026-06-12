@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Edit3, Trash2, X, Save, Utensils, CheckCircle, AlertCircle, Loader, Clock, ChefHat, Truck, ShoppingBag, Upload, Crown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import SidebarHotelier from '../../components/common/SidebarHotelier'
+import { useHotelActif } from '../../context/HotelActifContext'
 import api from '../../services/api'
 
 const resolverUrl = url => {
@@ -32,6 +33,7 @@ const CATEGORIES = [
 const PLAT_VIDE = { nom: '', categorie: 'plats', prix: '', description: '', est_disponible: true }
 
 export default function GestionRestauration() {
+  const { hotelActif } = useHotelActif()
   const [hotelId, setHotelId] = useState(null)
   const [hotel, setHotel] = useState(null)
   const [plats, setPlats] = useState([])
@@ -50,15 +52,13 @@ export default function GestionRestauration() {
 
   useEffect(() => {
     async function charger() {
+      if (!hotelActif) return
       try {
-        const res = await api.get('/gestionnaire/hotels/')
-        const hotel = res.data[0]
-        if (!hotel) return
-        setHotel(hotel)
-        setHotelId(hotel.id)
+        setHotel(hotelActif)
+        setHotelId(hotelActif.id)
         const [resPlats, resCommandes] = await Promise.all([
-          api.get(`/gestionnaire/hotels/${hotel.id}/menu/`),
-          api.get(`/gestionnaire/hotels/${hotel.id}/commandes/`),
+          api.get(`/gestionnaire/hotels/${hotelActif.id}/menu/`),
+          api.get(`/gestionnaire/hotels/${hotelActif.id}/commandes/`),
         ])
         setPlats(resPlats.data)
         setCommandes(resCommandes.data)
@@ -69,7 +69,7 @@ export default function GestionRestauration() {
       }
     }
     charger()
-  }, [])
+  }, [hotelActif?.id])
 
   const setChamp = (k, v) => setForm(p => ({ ...p, [k]: v }))
 

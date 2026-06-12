@@ -1,12 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ChevronLeft, Smartphone, Check, Loader2, Lock, Info } from 'lucide-react'
+import { ChevronLeft, Check, Loader2, Lock, Info, Shield, Zap } from 'lucide-react'
 import Layout from '../../components/common/Layout'
 import api from '../../services/api'
 
 const METHODES = [
-  { id: 'mtn', label: 'MTN Mobile Money', couleur: 'bg-yellow-400', logo: 'MTN', prefixe: '06' },
-  { id: 'moov', label: 'Moov Money', couleur: 'bg-blue-500', logo: 'MOOV', prefixe: '09' },
+  {
+    id: 'mtn',
+    label: 'MTN Mobile Money',
+    couleur: 'bg-yellow-400',
+    textColor: 'text-yellow-900',
+    logo: 'MTN',
+    testNum: '61234567',
+    iconBg: 'bg-yellow-50 border-yellow-200',
+    selectedBg: 'border-yellow-500 bg-yellow-50',
+  },
+  {
+    id: 'moov',
+    label: 'Moov Money',
+    couleur: 'bg-blue-600',
+    textColor: 'text-white',
+    logo: 'MOOV',
+    testNum: '96543210',
+    iconBg: 'bg-blue-50 border-blue-200',
+    selectedBg: 'border-blue-500 bg-blue-50',
+  },
 ]
 
 export default function Paiement() {
@@ -16,6 +34,9 @@ export default function Paiement() {
   const [telephone, setTelephone] = useState('')
   const [etape, setEtape] = useState('saisie') // saisie | attente | succes
   const [erreur, setErreur] = useState('')
+  const [transactionId, setTransactionId] = useState('')
+  const [secondes, setSecondes] = useState(4)
+  const timerRef = useRef(null)
 
   const reservationNumero = state?.reservationNumero
   const reservationData = state || {
@@ -33,6 +54,21 @@ export default function Paiement() {
   const taux = reservationData.commissionTaux || 3
   const commission = Math.round(total * taux / 100)
   const escrow = total - commission
+  const methodeActive = METHODES.find(m => m.id === methode)
+
+  // Compte à rebours sur l'écran d'attente
+  useEffect(() => {
+    if (etape === 'attente') {
+      setSecondes(4)
+      timerRef.current = setInterval(() => {
+        setSecondes(prev => {
+          if (prev <= 1) { clearInterval(timerRef.current); return 0 }
+          return prev - 1
+        })
+      }, 1000)
+    }
+    return () => clearInterval(timerRef.current)
+  }, [etape])
 
   const validerPaiement = async (e) => {
     e.preventDefault()
@@ -49,19 +85,24 @@ export default function Paiement() {
     setEtape('attente')
 
     try {
-      const res = await api.post(`/reservations/${reservationNumero}/paiement/`, {
-        methode: methode,
-        numero_telephone: `+229${telephone}`,
-      })
+      const [res] = await Promise.all([
+        api.post(`/reservations/${reservationNumero}/paiement/`, {
+          methode,
+          numero_telephone: `+229${telephone}`,
+        }),
+        new Promise(resolve => setTimeout(resolve, 4000)),
+      ])
+      setTransactionId(res.data.transaction_id || 'FDP-' + Math.random().toString(36).substring(2, 10).toUpperCase())
       setEtape('succes')
       setTimeout(() => {
         navigate(`/confirmation/${reservationNumero}`, {
           state: {
             reservation: res.data.reservation,
-            methodeLabel: methode === 'mtn' ? 'MTN Mobile Money' : 'Moov Money',
+            methodeLabel: methodeActive?.label,
+            transactionId: res.data.transaction_id,
           }
         })
-      }, 1500)
+      }, 2000)
     } catch (err) {
       setEtape('saisie')
       const data = err.response?.data
@@ -75,142 +116,166 @@ export default function Paiement() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm mb-6">
-          <ChevronLeft size={18} /> Retour à la réservation
-        </button>
+      <div className="max-w-lg mx-auto px-4 sm:px-6 py-8">
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Paiement sécurisé</h1>
-        <p className="text-gray-500 text-sm mb-6">Vos fonds sont protégés par le système Escrow PHAROS jusqu'à la fin de votre séjour.</p>
+        {etape === 'saisie' && (
+          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm mb-6">
+            <ChevronLeft size={18} /> Retour
+          </button>
+        )}
 
-        {/* Récapitulatif financier */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-5">
-          <h2 className="font-semibold text-gray-900 mb-4">Récapitulatif financier</h2>
-          <div className="space-y-2 text-sm">
-            {reservationData.panier.map((item, i) => (
-              <div key={i} className="flex justify-between text-gray-600">
-                <span>{item.type} × {item.quantite} ({reservationData.nuits} nuit{reservationData.nuits > 1 ? 's' : ''})</span>
-                <span>{((item.prix || 25000) * item.quantite * reservationData.nuits).toLocaleString()} FCFA</span>
+        {/* En-tête FedaPay simulation */}
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-5 shadow-sm">
+          <div className="bg-[#1A1A2E] px-5 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-[#FF6B2B] rounded-lg flex items-center justify-center">
+                <Zap size={16} className="text-white" />
               </div>
-            ))}
-
-            <div className="border-t border-gray-100 pt-3 mt-2 space-y-2">
-              <div className="flex justify-between font-bold text-gray-900 text-base">
-                <span>Total à payer</span>
-                <span className="text-blue-600">{total.toLocaleString()} FCFA</span>
+              <div>
+                <p className="text-white font-bold text-sm tracking-wide">FedaPay</p>
+                <p className="text-gray-400 text-xs">Paiement sécurisé</p>
               </div>
             </div>
+          </div>
 
-            {/* Décomposition escrow */}
-            <div className="mt-3 bg-gray-50 rounded-xl p-4 space-y-2 border border-gray-100">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Répartition des fonds</p>
-              <div className="flex justify-between text-sm">
-                <span className="flex items-center gap-1.5 text-gray-600">
-                  <div className="w-2.5 h-2.5 bg-blue-500 rounded-full" />
-                  Commission PHAROS ({taux}%)
-                </span>
-                <span className="font-semibold text-gray-700">{commission.toLocaleString()} FCFA</span>
+          {/* Montant */}
+          <div className="px-5 py-4 border-b border-gray-100 bg-gray-50">
+            <p className="text-xs text-gray-400 mb-0.5">{reservationData.hotelNom || 'PHAROS Bénin'}</p>
+            <p className="text-2xl font-black text-gray-900">{total.toLocaleString()} <span className="text-base font-semibold text-gray-500">FCFA</span></p>
+          </div>
+
+          {etape === 'saisie' && (
+            <div className="p-5">
+              <form onSubmit={validerPaiement}>
+
+                {/* Opérateur */}
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Opérateur</p>
+                <div className="grid grid-cols-2 gap-3 mb-5">
+                  {METHODES.map(m => (
+                    <button key={m.id} type="button" onClick={() => setMethode(m.id)}
+                      className={`p-3.5 rounded-xl border-2 transition-all text-left ${methode === m.id ? m.selectedBg : 'border-gray-200 hover:border-gray-300 bg-white'}`}>
+                      <div className={`w-9 h-9 ${m.couleur} rounded-lg flex items-center justify-center mb-2`}>
+                        <span className={`text-xs font-black ${m.textColor}`}>{m.logo}</span>
+                      </div>
+                      <p className="font-semibold text-sm text-gray-800 leading-tight">{m.label}</p>
+                      {methode === m.id && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <Check size={11} className="text-blue-600" />
+                          <span className="text-xs text-blue-600 font-medium">Sélectionné</span>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Téléphone */}
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Numéro de téléphone</p>
+                <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-3 focus-within:border-[#FF6B2B] transition-colors mb-2">
+                  <span className="text-gray-500 text-sm font-semibold">+229</span>
+                  <div className="w-px h-5 bg-gray-200" />
+                  <input type="tel" value={telephone}
+                    onChange={e => setTelephone(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                    placeholder="XXXXXXXX" className="flex-1 text-sm text-gray-800 outline-none" required />
+                </div>
+
+{erreur && <p className="text-red-500 text-xs mt-2 mb-1">{erreur}</p>}
+
+                <p className="text-xs text-gray-400 mb-5">
+                  Vous recevrez une confirmation {methodeActive?.label} pour valider le paiement.
+                </p>
+
+                <button type="submit"
+                  className="w-full bg-[#FF6B2B] hover:bg-orange-600 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                  Payer {total.toLocaleString()} FCFA
+                </button>
+              </form>
+            </div>
+          )}
+
+          {etape === 'attente' && (
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 relative">
+                <div className={`w-16 h-16 ${methodeActive?.couleur} rounded-full flex items-center justify-center`}>
+                  <span className={`text-lg font-black ${methodeActive?.textColor}`}>{methodeActive?.logo}</span>
+                </div>
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center border-2 border-gray-100">
+                  <Loader2 size={14} className="text-[#FF6B2B] animate-spin" />
+                </div>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="flex items-center gap-1.5 text-gray-600">
-                  <div className="w-2.5 h-2.5 bg-amber-500 rounded-full" />
-                  Mis en Escrow pour l'hôtel
-                </span>
-                <span className="font-semibold text-gray-700">{escrow.toLocaleString()} FCFA</span>
+              <h2 className="text-base font-bold text-gray-900 mb-1">Confirmation en cours...</h2>
+              <p className="text-gray-500 text-sm mb-4">
+                Vérifiez votre téléphone <strong>+229 {telephone}</strong>
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-left">
+                <p className="text-xs font-semibold text-amber-800 mb-1">En attente de validation {methodeActive?.label}</p>
+                <p className="text-xs text-amber-600">Montant : <strong>{total.toLocaleString()} FCFA</strong></p>
+                <p className="text-xs text-amber-500 mt-1 flex items-center gap-1">
+                  <Loader2 size={10} className="animate-spin" />
+                  Traitement{secondes > 0 ? ` (${secondes}s)` : '...'}
+                </p>
               </div>
-              <div className="mt-2 pt-2 border-t border-gray-200">
-                <p className="text-xs text-gray-400 flex items-start gap-1.5">
-                  <Info size={11} className="mt-0.5 shrink-0 text-blue-400" />
-                  Les {escrow.toLocaleString()} FCFA sont conservés par PHAROS et transférés à l'hôtel uniquement après votre séjour.
+            </div>
+          )}
+
+          {etape === 'succes' && (
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Check size={32} className="text-green-600" />
+              </div>
+              <h2 className="text-lg font-bold text-gray-900 mb-1">Paiement confirmé !</h2>
+              <p className="text-gray-500 text-sm mb-3">Redirection vers votre confirmation...</p>
+              {transactionId && (
+                <p className="text-xs text-gray-400 font-mono bg-gray-50 rounded-lg px-3 py-1.5 inline-block">
+                  {transactionId}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Footer FedaPay */}
+          <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-center gap-2">
+            <Shield size={12} className="text-gray-400" />
+            <span className="text-xs text-gray-400">Sécurisé par <strong className="text-gray-500">FedaPay</strong></span>
+          </div>
+        </div>
+
+        {/* Récapitulatif escrow */}
+        {etape === 'saisie' && (
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-5">
+            <h2 className="font-semibold text-gray-900 mb-3 text-sm">Répartition des fonds</h2>
+            <div className="space-y-2 text-sm">
+              {(reservationData.panier || []).map((item, i) => (
+                <div key={i} className="flex justify-between text-gray-500 text-xs">
+                  <span>{item.type} × {item.quantite || 1} ({reservationData.nuits} nuit{reservationData.nuits > 1 ? 's' : ''})</span>
+                  <span>{((item.prix || 25000) * (item.quantite || 1) * reservationData.nuits).toLocaleString()} FCFA</span>
+                </div>
+              ))}
+              <div className="border-t border-gray-100 pt-2 mt-2 space-y-2">
+                <div className="flex justify-between text-xs">
+                  <span className="flex items-center gap-1.5 text-gray-500">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                    Commission PHAROS ({taux}%)
+                  </span>
+                  <span className="font-medium text-gray-700">{commission.toLocaleString()} FCFA</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="flex items-center gap-1.5 text-gray-500">
+                    <div className="w-2 h-2 bg-amber-500 rounded-full" />
+                    Escrow pour l'hôtel
+                  </span>
+                  <span className="font-medium text-gray-700">{escrow.toLocaleString()} FCFA</span>
+                </div>
+              </div>
+              <div className="bg-blue-50 rounded-xl p-3 mt-2">
+                <p className="text-xs text-blue-600 flex items-start gap-1.5">
+                  <Info size={11} className="mt-0.5 shrink-0" />
+                  Les {escrow.toLocaleString()} FCFA sont libérés vers l'hôtel uniquement après confirmation des deux parties.
                 </p>
               </div>
             </div>
           </div>
-        </div>
-
-        {etape === 'saisie' && (
-          <form onSubmit={validerPaiement}>
-            {/* Choix méthode */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-5">
-              <h2 className="font-semibold text-gray-900 mb-4">Méthode de paiement</h2>
-              <div className="grid grid-cols-2 gap-3">
-                {METHODES.map(m => (
-                  <button key={m.id} type="button" onClick={() => setMethode(m.id)}
-                    className={`p-4 rounded-xl border-2 transition-all text-left ${methode === m.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                    <div className={`w-10 h-10 ${m.couleur} rounded-lg flex items-center justify-center text-xl mb-2`}>{m.logo}</div>
-                    <p className="font-medium text-sm text-gray-800">{m.label}</p>
-                    {methode === m.id && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <Check size={12} className="text-blue-600" />
-                        <span className="text-xs text-blue-600">Sélectionné</span>
-                      </div>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Numéro Mobile Money */}
-            <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-5">
-              <h2 className="font-semibold text-gray-900 mb-4">Numéro Mobile Money</h2>
-              <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-3 focus-within:border-blue-400 transition-colors">
-                <span className="text-gray-500 text-sm font-medium">+229</span>
-                <div className="w-px h-5 bg-gray-200" />
-                <input type="tel" value={telephone}
-                  onChange={e => setTelephone(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                  placeholder="XXXXXXXX" className="flex-1 text-sm text-gray-800 outline-none" required />
-              </div>
-              {erreur && <p className="text-red-500 text-xs mt-1">{erreur}</p>}
-              <p className="text-xs text-gray-400 mt-2">
-                Vous recevrez une notification pour confirmer le paiement de <strong>{total.toLocaleString()} FCFA</strong>.
-              </p>
-            </div>
-
-            {/* Notice escrow */}
-            <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5">
-              <Lock size={20} className="text-blue-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-blue-800">Comment fonctionne l'Escrow PHAROS ?</p>
-                <ul className="text-xs text-blue-600 mt-1 space-y-1 list-disc list-inside">
-                  <li>Vous payez {total.toLocaleString()} FCFA aujourd'hui</li>
-                  <li>PHAROS conserve {escrow.toLocaleString()} FCFA jusqu'à la fin de votre séjour</li>
-                  <li>Après le séjour, vous et l'hôtel confirmez sur la plateforme</li>
-                  <li>Les fonds sont alors transférés à l'hôtel</li>
-                  <li>En cas de problème, vous êtes remboursé</li>
-                </ul>
-              </div>
-            </div>
-
-            <button type="submit"
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-colors text-lg">
-              <Smartphone size={22} />
-              Payer {total.toLocaleString()} FCFA
-            </button>
-          </form>
         )}
 
-        {etape === 'attente' && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
-            <Loader2 size={48} className="text-blue-600 animate-spin mx-auto mb-4" />
-            <h2 className="text-lg font-bold text-gray-900 mb-2">Traitement en cours...</h2>
-            <p className="text-gray-500 text-sm">Vérifiez votre téléphone et confirmez le paiement {methode === 'mtn' ? 'MTN Mobile Money' : 'Moov Money'}.</p>
-            <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-left">
-              <p className="text-sm font-semibold text-yellow-800">En attente de confirmation</p>
-              <p className="text-xs text-yellow-600 mt-1">Numéro : +229 {telephone}</p>
-              <p className="text-xs text-yellow-600">Montant : {total.toLocaleString()} FCFA</p>
-            </div>
-          </div>
-        )}
-
-        {etape === 'succes' && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Check size={32} className="text-green-600" />
-            </div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Paiement confirmé !</h2>
-            <p className="text-gray-500 text-sm">Redirection vers votre confirmation...</p>
-          </div>
-        )}
       </div>
     </Layout>
   )

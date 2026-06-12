@@ -2,24 +2,27 @@ import { useState, useEffect } from 'react'
 import { Check, Zap, TrendingUp, Star, Image, BarChart2, MessageSquare, Tag, Megaphone, Crown, Lock, Loader, Info, CheckCircle2, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
 import SidebarHotelier from '../../components/common/SidebarHotelier'
+import { useHotelActif } from '../../context/HotelActifContext'
 import api from '../../services/api'
 
 const ICONES_AVANTAGES = [Image, Crown, TrendingUp, BarChart2, MessageSquare, Tag, Megaphone, Star, Zap]
 
 export default function GestionAbonnements() {
+  const { hotelActif } = useHotelActif()
   const [abonnementInfo, setAbonnementInfo] = useState(null)
   const [chargement, setChargement] = useState(true)
   const [confirmModal, setConfirmModal] = useState(false)
   const [upgradeLoading, setUpgradeLoading] = useState(false)
 
   const charger = () => {
-    api.get('/gestionnaire/abonnement/')
+    const params = hotelActif ? `?hotel_id=${hotelActif.id}` : ''
+    api.get(`/gestionnaire/abonnement/${params}`)
       .then(res => setAbonnementInfo(res.data))
       .catch(() => toast.error('Erreur lors du chargement de l\'abonnement'))
       .finally(() => setChargement(false))
   }
 
-  useEffect(() => { charger() }, [])
+  useEffect(() => { if (hotelActif) charger() }, [hotelActif?.id])
 
   const estPro = abonnementInfo?.type_actuel === 'pro'
   const demandeEnCours = abonnementInfo?.demande_en_cours === true
@@ -29,7 +32,7 @@ export default function GestionAbonnements() {
   const demanderUpgrade = async () => {
     setUpgradeLoading(true)
     try {
-      await api.post('/gestionnaire/abonnement/upgrade/')
+      await api.post('/gestionnaire/abonnement/upgrade/', { hotel_id: hotelActif?.id })
       toast.success('Demande envoyée ! L\'administrateur va traiter votre demande.')
       setConfirmModal(false)
       charger()

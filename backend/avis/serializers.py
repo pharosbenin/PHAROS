@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Avis, SignalementAvis
+from .models import Avis, SignalementAvis, SignalementContenu, SignalementHotel
 
 
 class AvisSerializer(serializers.ModelSerializer):
@@ -39,11 +39,64 @@ class AvisCreerSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         validated_data['client'] = self.context['request'].user
+        validated_data['est_approuve'] = True
         return super().create(validated_data)
 
 
 class RepondreAvisSerializer(serializers.Serializer):
     reponse = serializers.CharField()
+
+
+class SignalementContenuSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SignalementContenu
+        fields = ('reservation', 'hotel', 'avis_initial', 'explication')
+
+    def validate(self, attrs):
+        request = self.context['request']
+        reservation = attrs.get('reservation')
+        if reservation and reservation.client != request.user:
+            raise serializers.ValidationError({'reservation': "Cette réservation ne vous appartient pas."})
+        return attrs
+
+    def create(self, validated_data):
+        validated_data['client'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+class SignalementContenuAdminSerializer(serializers.ModelSerializer):
+    hotel_nom = serializers.CharField(source='hotel.nom', read_only=True)
+    client_nom = serializers.SerializerMethodField()
+
+    class Meta:
+        model = SignalementContenu
+        fields = ('id', 'hotel_nom', 'client_nom', 'avis_initial', 'explication', 'statut', 'date_signalement')
+
+    def get_client_nom(self, obj):
+        return obj.client.nom_complet if obj.client else 'Anonyme'
+
+
+class SignalementHotelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SignalementHotel
+        fields = ('hotel', 'motif', 'description')
+
+    def create(self, validated_data):
+        validated_data['client'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+class SignalementHotelAdminSerializer(serializers.ModelSerializer):
+    hotel_nom = serializers.CharField(source='hotel.nom', read_only=True)
+    client_nom = serializers.SerializerMethodField()
+    motif_display = serializers.CharField(source='get_motif_display', read_only=True)
+
+    class Meta:
+        model = SignalementHotel
+        fields = ('id', 'hotel_nom', 'client_nom', 'motif', 'motif_display', 'description', 'statut', 'date_signalement')
+
+    def get_client_nom(self, obj):
+        return obj.client.nom_complet if obj.client else 'Anonyme'
 
 
 class SignalementSerializer(serializers.ModelSerializer):

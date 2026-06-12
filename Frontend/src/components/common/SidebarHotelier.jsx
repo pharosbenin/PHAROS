@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Building2, BedDouble, UtensilsCrossed,
-  CalendarCheck, Star, CreditCard, LogOut
+  CalendarCheck, Star, CreditCard, LogOut, ChevronDown
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import api from '../../services/api'
+import { useHotelActif } from '../../context/HotelActifContext'
 
 const navItems = [
   { to: '/hotelier/dashboard', icon: LayoutDashboard, label: 'Tableau de bord' },
@@ -22,12 +23,14 @@ export default function SidebarHotelier() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [typeAbonnement, setTypeAbonnement] = useState(null)
+  const { hotels, hotelActif, changerHotel } = useHotelActif() || {}
 
   useEffect(() => {
-    api.get('/gestionnaire/abonnement/')
+    const params = hotelActif ? `?hotel_id=${hotelActif.id}` : ''
+    api.get(`/gestionnaire/abonnement/${params}`)
       .then(res => setTypeAbonnement(res.data.type_actuel))
       .catch(() => setTypeAbonnement(user?.abonnement || 'freemium'))
-  }, [])
+  }, [hotelActif?.id])
 
   const estPro = typeAbonnement === 'pro'
 
@@ -67,6 +70,25 @@ export default function SidebarHotelier() {
                 <span className="text-xs text-gray-400">Freemium</span>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sélecteur d'hôtel (multi-hôtels) */}
+      {hotels && hotels.length > 1 && (
+        <div className="px-4 pb-3 border-b border-gray-100">
+          <label className="text-xs text-gray-400 font-semibold block mb-1.5">Établissement actif</label>
+          <div className="relative">
+            <select
+              value={hotelActif?.id || ''}
+              onChange={e => changerHotel(parseInt(e.target.value))}
+              className="w-full appearance-none text-xs bg-blue-50 border border-blue-100 text-blue-700 rounded-lg px-3 py-2 font-semibold outline-none cursor-pointer pr-7"
+            >
+              {hotels.map(h => (
+                <option key={h.id} value={h.id}>{h.nom}</option>
+              ))}
+            </select>
+            <ChevronDown size={13} className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-400 pointer-events-none" />
           </div>
         </div>
       )}

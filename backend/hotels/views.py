@@ -1,16 +1,18 @@
-from django.db.models import Q
+from django.db.models import Q, Exists, OuterRef
+from django.utils import timezone
 from rest_framework import status, generics
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.permissions import EstGestionnaire, EstAdmin, EstNonSuspendu, EstHotelValide
-from .models import Hotel, TypeChambre, PhotoHotel, PhotoChambre, PlatMenu, CommandeRestaurant, LigneCommande
+from .models import Hotel, TypeChambre, PhotoHotel, PhotoChambre, PlatMenu, CommandeRestaurant, LigneCommande, Promotion
 from .serializers import (
     HotelListeSerializer, HotelDetailSerializer, HotelCreerSerializer,
     HotelAdminSerializer, TypeChambreSerializer, TypeChambreEcrireSerializer,
     PhotoHotelSerializer, PhotoChambreSerializer, PlatMenuSerializer,
     CommandeRestaurantSerializer, LigneCommandeCreerSerializer, StatutCommandeSerializer,
+    PromotionSerializer,
 )
 
 
@@ -21,6 +23,7 @@ class RechercheHotels(generics.ListAPIView):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
+        from evenements.models import MiseEnAvantHotel
         qs = Hotel.objects.filter(statut='valide')
         params = self.request.query_params
         if ville := params.get('ville'):
@@ -31,8 +34,31 @@ class RechercheHotels(generics.ListAPIView):
             qs = qs.filter(types_chambres__prix_nuit__lte=prix_max).distinct()
         if capacite := params.get('capacite'):
             qs = qs.filter(types_chambres__capacite__gte=capacite).distinct()
-        # PRO d'abord
-        return qs.order_by('-type_abonnement', '-note_moyenne')
+
+        # Boost événement : hôtels PRO avec MiseEnAvantHotel active remontent en tête
+        today = timezone.now().date()
+        boost_actif = MiseEnAvantHotel.objects.filter(
+            hotel=OuterRef('pk'),
+            est_actif=True,
+            date_boost_debut__lte=today,
+            date_boost_fin__gte=today,
+        )
+        qs = qs.annotate(est_booste=Exists(boost_actif))
+        return qs.order_by('-est_booste', '-type_abonnement', '-note_moyenne')
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def villes_disponibles(request):
+    villes = (
+        Hotel.objects
+        .exclude(ville__isnull=True)
+        .exclude(ville__exact='')
+        .values_list('ville', flat=True)
+        .distinct()
+        .order_by('ville')
+    )
+    return Response(sorted(set(villes), key=lambda v: v.lower()))
 
 
 @api_view(['GET'])
@@ -156,6 +182,40 @@ def supprimer_photo_chambre(request, hotel_pk, chambre_pk, photo_pk):
     if photo.image:
         photo.image.delete(save=False)
     photo.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+# --- Promotions (Pro uniquement) ---
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated, EstGestionnaire, EstNonSuspendu])
+def promotions_hotel(request, hotel_pk):
+    from django.shortcuts import get_object_or_404
+    hotel = get_object_or_404(Hotel, pk=hotel_pk, gestionnaire=request.user)
+    if hotel.type_abonnement != 'pro':
+        return Response({'detail': "Les promotions sont réservées aux hôtels Partenaire Pro."}, status=status.HTTP_403_FORBIDDEN)
+
+    if request.method == 'GET':
+        promos = Promotion.objects.filter(type_chambre__hotel=hotel).select_related('type_chambre')
+        return Response(PromotionSerializer(promos, many=True).data)
+
+    serializer = PromotionSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    chambre = serializer.validated_data['type_chambre']
+    if chambre.hotel != hotel:
+        return Response({'detail': "Cette chambre n'appartient pas à votre hôtel."}, status=status.HTTP_400_BAD_REQUEST)
+    serializer.save()
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated, EstGestionnaire, EstNonSuspendu])
+def supprimer_promotion(request, hotel_pk, promo_pk):
+    from django.shortcuts import get_object_or_404
+    hotel = get_object_or_404(Hotel, pk=hotel_pk, gestionnaire=request.user)
+    promo = get_object_or_404(Promotion, pk=promo_pk, type_chambre__hotel=hotel)
+    promo.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
 
 

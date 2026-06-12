@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { TrendingUp, Hotel, CheckCircle, Clock, AlertCircle, Search, Crown, X, Check, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
 import SidebarAdmin from '../../components/common/SidebarAdmin'
 import api from '../../services/api'
+import usePolling from '../../hooks/usePolling'
 
 const TAUX_ACTUELS = [
   { type: 'FREEMIUM', taux: 3, description: 'Abonnement de base — accès aux fonctionnalités essentielles', couleur: 'border-gray-200', badge: 'bg-gray-100 text-gray-700' },
@@ -36,7 +37,7 @@ export default function GestionCommissions() {
     }).finally(() => setChargement(false))
   }
 
-  useEffect(() => { charger() }, [])
+  usePolling(charger, 30000)
 
   const approuver = async (id) => {
     setTraitementId(id)

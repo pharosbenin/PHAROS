@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../../services/api'
 import {
@@ -6,13 +6,35 @@ import {
   ChevronRight, ChevronLeft, Eye, EyeOff, X, CheckCircle,
   AlertCircle, Percent, Clock, Info, Camera, Globe
 } from 'lucide-react'
+import Layout from '../../components/common/Layout'
 
 const STORAGE_KEY = 'pharos_inscription_hotelier'
 
 const VILLES_BENIN = [
-  'Cotonou', 'Porto-Novo', 'Parakou', 'Abomey-Calavi', 'Djougou',
-  'Bohicon', 'Kandi', 'Lokossa', 'Ouidah', 'Natitingou',
-  'Dassa-Zoumè', 'Abomey', 'Nikki', 'Malanville'
+  // Littoral
+  'Cotonou',
+  // Ouémé
+  'Porto-Novo', 'Adjohoun', 'Akpro-Missérété', 'Avrankou', 'Bonou', 'Dangbo', 'Missérété', 'Sèmè-Kpodji',
+  // Atlantique
+  'Abomey-Calavi', 'Allada', 'Ouidah', 'Kpomassè', 'Sô-Ava', 'Toffo', 'Tori-Bossito', 'Zè',
+  // Borgou
+  'Parakou', 'Bembèrèkè', 'Kalalé', "N'Dali", 'Nikki', 'Pèrèrè', 'Sinendé', 'Tchaourou',
+  // Zou
+  'Abomey', 'Bohicon', 'Agbangnizoun', 'Covè', 'Djidja', 'Ouinhi', 'Zagnanado', 'Za-Kpota', 'Zogbodomè',
+  // Collines
+  'Dassa-Zoumè', 'Glazoué', 'Bantè', 'Ouèssè', 'Savalou', 'Savè',
+  // Atacora
+  'Natitingou', 'Boukoumbé', 'Cobly', 'Copargo', 'Kérou', 'Kouandé', 'Matéri', 'Péhunco', 'Tanguiéta', 'Toukountouna',
+  // Alibori
+  'Malanville', 'Banikoara', 'Gogounou', 'Kandi', 'Karimama', 'Ségbana',
+  // Donga
+  'Djougou', 'Bassila', 'Ouaké',
+  // Mono
+  'Lokossa', 'Athiémé', 'Bopa', 'Comè', 'Grand-Popo', 'Houéyogbé',
+  // Couffo
+  'Aplahoué', 'Djakotomey', 'Dogbo', 'Klouékanmè', 'Lalo', 'Toviklin',
+  // Plateau
+  'Kétou', 'Pobè', 'Sakété', 'Adja-Ouèrè', 'Ifangni',
 ]
 
 const ETAPES = [
@@ -30,7 +52,7 @@ const COMPTE_VIDE = {
 const ETAB_VIDE = {
   nom: '', description: '', adresse: '', ville: '',
   latitude: '', longitude: '', videoYoutube: '',
-  tauxAnnulation: '', tauxModification: '', delaiGratuit: ''
+  tauxAnnulation: '', tauxModification: ''
 }
 
 export default function InscriptionHotelier() {
@@ -45,6 +67,14 @@ export default function InscriptionHotelier() {
   const photoRef = useRef()
   const registreRef = useRef()
   const identiteRef = useRef()
+
+  // OTP
+  const [showOtpModal, setShowOtpModal] = useState(false)
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', ''])
+  const [otpErreur, setOtpErreur] = useState('')
+  const [otpLoading, setOtpLoading] = useState(false)
+  const [otpTimer, setOtpTimer] = useState(0)
+  const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()]
 
   const [compte, setCompte] = useState(COMPTE_VIDE)
   const [etab, setEtab] = useState(ETAB_VIDE)
@@ -76,6 +106,72 @@ export default function InscriptionHotelier() {
     } catch {}
   }, [etape, compte, etab, soumis])
 
+  // Compte à rebours OTP
+  useEffect(() => {
+    if (otpTimer <= 0) return
+    const t = setTimeout(() => setOtpTimer(s => s - 1), 1000)
+    return () => clearTimeout(t)
+  }, [otpTimer])
+
+  const envoyerOtp = async () => {
+    setOtpErreur('')
+    setOtpLoading(true)
+    try {
+      const tel = `+229${compte.telephone}`
+      const { data } = await api.post('/auth/otp/envoyer/', { telephone: tel })
+      setOtpTimer(300)
+      if (data.dev_code) {
+        // Mode simulation : auto-remplissage du code
+        setOtpDigits(data.dev_code.split(''))
+      } else {
+        setOtpDigits(['', '', '', '', '', ''])
+        setTimeout(() => otpRefs[0].current?.focus(), 100)
+      }
+    } catch (err) {
+      setOtpErreur(err.response?.data?.detail || 'Impossible d\'envoyer le code. Réessayez.')
+    } finally {
+      setOtpLoading(false)
+    }
+  }
+
+  const handleOtpDigit = (i, val) => {
+    if (!/^\d?$/.test(val)) return
+    const next = [...otpDigits]
+    next[i] = val
+    setOtpDigits(next)
+    if (val && i < 5) otpRefs[i + 1].current?.focus()
+  }
+
+  const handleOtpKeyDown = (i, e) => {
+    if (e.key === 'Backspace' && !otpDigits[i] && i > 0) {
+      otpRefs[i - 1].current?.focus()
+    }
+  }
+
+  const handleOtpPaste = (e) => {
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6)
+    if (pasted.length === 6) {
+      setOtpDigits(pasted.split(''))
+      otpRefs[5].current?.focus()
+    }
+  }
+
+  const verifierOtp = async () => {
+    const code = otpDigits.join('')
+    if (code.length < 6) { setOtpErreur('Entrez les 6 chiffres du code.'); return }
+    setOtpErreur('')
+    setOtpLoading(true)
+    try {
+      await api.post('/auth/otp/verifier/', { telephone: `+229${compte.telephone}`, code })
+      setShowOtpModal(false)
+      setEtape(2)
+    } catch (err) {
+      setOtpErreur(err.response?.data?.detail || 'Code incorrect. Réessayez.')
+    } finally {
+      setOtpLoading(false)
+    }
+  }
+
   const setC = (k, v) => setCompte(p => ({ ...p, [k]: v }))
   const setE = (k, v) => setEtab(p => ({ ...p, [k]: v }))
 
@@ -101,7 +197,7 @@ export default function InscriptionHotelier() {
       }
     }
     if (etape === 2) {
-      if (!etab.nom || !etab.description || !etab.adresse || !etab.ville || !etab.tauxAnnulation || !etab.tauxModification || !etab.delaiGratuit) {
+      if (!etab.nom || !etab.description || !etab.adresse || !etab.ville || !etab.tauxAnnulation || !etab.tauxModification) {
         setErreur('Veuillez remplir tous les champs obligatoires.')
         return false
       }
@@ -123,6 +219,12 @@ export default function InscriptionHotelier() {
 
   const suivant = async () => {
     if (!validerEtape()) return
+    if (etape === 1) {
+      // Déclencher vérification OTP avant de passer à l'étape 2
+      setShowOtpModal(true)
+      envoyerOtp()
+      return
+    }
     if (etape < 4) {
       setEtape(e => e + 1)
       return
@@ -155,6 +257,8 @@ export default function InscriptionHotelier() {
       formHotel.append('ville', etab.ville)
       if (etab.latitude) formHotel.append('latitude', etab.latitude)
       if (etab.longitude) formHotel.append('longitude', etab.longitude)
+      formHotel.append('taux_annulation', etab.tauxAnnulation)
+      formHotel.append('taux_modification', etab.tauxModification)
       if (photos[0]?.file) formHotel.append('photo_principale', photos[0].file)
       if (docs.registre) formHotel.append('document_registre', docs.registre)
 
@@ -198,7 +302,8 @@ export default function InscriptionHotelier() {
 
   if (soumis) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center px-4 py-12">
+      <Layout>
+      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center px-4 py-14">
         <div className="w-full max-w-md text-center">
           <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle size={40} className="text-green-500" />
@@ -218,20 +323,89 @@ export default function InscriptionHotelier() {
           </Link>
         </div>
       </div>
+      </Layout>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center px-4 py-12">
-      <div className="w-full max-w-xl">
+    <Layout>
 
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-block">
-            <img src="/logo.png.jpeg" alt="PHAROS BÉNIN" className="h-20 w-auto mx-auto" />
-          </Link>
-          <p className="text-gray-500 text-sm mt-3">Inscrire mon établissement</p>
+    {/* ===== MODAL OTP ===== */}
+    {showOtpModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+          {/* Icône */}
+          <div className="flex justify-center mb-5">
+            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center">
+              <Phone size={28} className="text-blue-600" />
+            </div>
+          </div>
+
+          <h2 className="text-xl font-black text-gray-900 text-center mb-1">Vérification du numéro</h2>
+          <p className="text-sm text-gray-500 text-center mb-6">
+            Un code à 6 chiffres a été envoyé par SMS au<br />
+            <span className="font-bold text-gray-800">+229 {compte.telephone}</span>
+          </p>
+
+          {/* 6 cases OTP */}
+          <div className="flex justify-center gap-2 mb-4" onPaste={handleOtpPaste}>
+            {otpDigits.map((d, i) => (
+              <input
+                key={i}
+                ref={otpRefs[i]}
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                value={d}
+                onChange={e => handleOtpDigit(i, e.target.value)}
+                onKeyDown={e => handleOtpKeyDown(i, e)}
+                className={`w-11 h-13 text-center text-xl font-black border-2 rounded-xl outline-none transition-all
+                  ${d ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-gray-50'}
+                  focus:border-blue-600 focus:bg-blue-50`}
+              />
+            ))}
+          </div>
+
+          {/* Erreur */}
+          {otpErreur && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">
+              <AlertCircle size={16} className="shrink-0" />
+              {otpErreur}
+            </div>
+          )}
+
+          {/* Timer + Renvoyer */}
+          <div className="text-center text-sm text-gray-500 mb-5">
+            {otpTimer > 0 ? (
+              <span>Renvoyer le code dans <strong className="text-blue-600">{Math.floor(otpTimer / 60)}:{String(otpTimer % 60).padStart(2, '0')}</strong></span>
+            ) : (
+              <button onClick={envoyerOtp} disabled={otpLoading}
+                className="text-blue-600 font-semibold hover:underline disabled:opacity-50">
+                Renvoyer le code
+              </button>
+            )}
+          </div>
+
+          {/* Bouton vérifier */}
+          <button
+            onClick={verifierOtp}
+            disabled={otpLoading || otpDigits.join('').length < 6}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-colors mb-3"
+          >
+            {otpLoading ? 'Vérification...' : 'Vérifier et continuer'}
+          </button>
+
+          {/* Annuler */}
+          <button onClick={() => setShowOtpModal(false)}
+            className="w-full text-gray-500 hover:text-gray-700 text-sm font-medium py-2">
+            ← Modifier mon numéro
+          </button>
         </div>
+      </div>
+    )}
+
+    <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center px-4 py-14">
+      <div className="w-full max-w-xl">
 
         {/* Barre de progression */}
         <div className="flex items-center mb-8">
@@ -492,21 +666,9 @@ export default function InscriptionHotelier() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs text-gray-600 font-medium block mb-1.5">Délai d'annulation gratuite *</label>
-                  <div className="relative">
-                    <Clock size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input type="number" min="0" value={etab.delaiGratuit}
-                      onChange={e => setE('delaiGratuit', Math.max(0, e.target.value))}
-                      placeholder="Ex : 48"
-                      className="w-full border border-gray-200 rounded-xl pl-10 pr-16 py-3 text-sm outline-none focus:border-blue-400 bg-white" />
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium">heures</span>
-                  </div>
-                  {etab.delaiGratuit && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Annulation &gt; {etab.delaiGratuit}h avant arrivée → aucun frais. En dessous → {etab.tauxAnnulation || '?'}% appliqué.
-                    </p>
-                  )}
+                <div className="col-span-full bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700 flex items-start gap-2">
+                  <Info size={14} className="shrink-0 mt-0.5" />
+                  La plateforme accorde automatiquement 2h après le paiement pour annuler ou modifier gratuitement. Au-delà, vos taux ci-dessus s'appliquent.
                 </div>
               </div>
             </div>
@@ -679,5 +841,6 @@ export default function InscriptionHotelier() {
         </p>
       </div>
     </div>
+    </Layout>
   )
 }

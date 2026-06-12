@@ -1,14 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ChevronLeft, AlertTriangle, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { ChevronLeft, AlertTriangle, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, Info, Loader2 } from 'lucide-react'
 import Layout from '../../components/common/Layout'
-
-const RESERVATIONS_CLIENT = [
-  { id: 'RES-2026-001234', hotelNom: 'Hôtel du Lac', dateArrivee: '2026-06-10', dateDepart: '2026-06-12', total: 50000, commissionTaux: 3, tauxPenaliteHotel: 25 },
-  { id: 'RES-2026-000891', hotelNom: 'Villa Ouidah Heritage', dateArrivee: '2026-07-15', dateDepart: '2026-07-18', total: 240000, commissionTaux: 5, tauxPenaliteHotel: 30 },
-  { id: 'RES-2026-002100', hotelNom: 'Grand Hôtel de Parakou', dateArrivee: '2026-05-28', dateDepart: '2026-05-30', total: 60000, commissionTaux: 3, tauxPenaliteHotel: 20 },
-  { id: 'RES-2026-002050', hotelNom: 'Résidence Bénin Palace', dateArrivee: '2026-05-20', dateDepart: '2026-05-22', total: 90000, commissionTaux: 5, tauxPenaliteHotel: 20 },
-]
+import api from '../../services/api'
 
 const MOTIFS = [
   'Changement de programme',
@@ -19,6 +13,8 @@ const MOTIFS = [
   'Autre raison',
 ]
 
+const STATUTS_ANNULABLES = ['payee', 'confirmee', 'confirme_client', 'confirme_hotel', 'en_cours']
+
 export default function Remboursement() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -28,8 +24,37 @@ export default function Remboursement() {
   const [details, setDetails] = useState('')
   const [erreur, setErreur] = useState('')
   const [regleOuverte, setRegleOuverte] = useState(false)
+  const [reservations, setReservations] = useState([])
+  const [chargement, setChargement] = useState(true)
+  const [soumission, setSoumission] = useState(false)
 
-  const reservation = RESERVATIONS_CLIENT.find(r => r.id === reservationId)
+  useEffect(() => {
+    api.get('/client/reservations/')
+      .then(res => {
+        const today = new Date().toISOString().split('T')[0]
+        const annulables = res.data
+          .filter(r =>
+            STATUTS_ANNULABLES.includes(r.statut) &&
+            r.date_arrivee > today &&
+            !r.annulation_info
+          )
+          .map(r => ({
+            numero: r.numero,
+            hotelNom: r.hotel_nom,
+            dateArrivee: r.date_arrivee,
+            dateDepart: r.date_depart,
+            total: parseFloat(r.prix_total),
+            commissionTaux: r.commission_taux ?? 3,
+            tauxPenaliteHotel: r.hotel_taux_annulation ?? 20,
+            datePaiement: r.date_paiement || null,
+          }))
+        setReservations(annulables)
+      })
+      .catch(() => setReservations([]))
+      .finally(() => setChargement(false))
+  }, [])
+
+  const reservation = reservations.find(r => r.numero === reservationId)
 
   const calculerRemboursement = (r) => {
     if (!r) return null
@@ -57,9 +82,23 @@ export default function Remboursement() {
     e.preventDefault()
     if (!reservationId) { setErreur('Sélectionnez une réservation'); return }
     if (!motif) { setErreur('Sélectionnez un motif'); return }
-    if (calcul?.depasse) { setErreur('Cette réservation est déjà passée, le séjour a eu lieu.'); return }
+    if (calcul?.depasse) { setErreur('Cette réservation est déjà passée.'); return }
     setErreur('')
     setEtape('confirmation')
+  }
+
+  const confirmerAnnulation = async () => {
+    setSoumission(true)
+    try {
+      await api.post(`/reservations/${reservationId}/annuler/`, { motif, details })
+      setEtape('soumis')
+    } catch (err) {
+      const msg = err.response?.data?.detail || 'Erreur lors de la demande. Veuillez réessayer.'
+      setErreur(msg)
+      setEtape('formulaire')
+    } finally {
+      setSoumission(false)
+    }
   }
 
   return (
@@ -75,7 +114,7 @@ export default function Remboursement() {
           La commission PHAROS est conservée dans tous les cas. Le remboursement dépend du délai avant votre arrivée.
         </p>
 
-        {/* Règles PHAROS */}
+        {/* Règles */}
         <div className="bg-white rounded-2xl border border-gray-100 mb-6">
           <button
             onClick={() => setRegleOuverte(!regleOuverte)}
@@ -116,54 +155,67 @@ export default function Remboursement() {
 
         {etape === 'formulaire' && (
           <form onSubmit={soumettreFormulaire}>
-            {/* Sélection réservation */}
             <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-5">
               <h2 className="font-semibold text-gray-900 mb-4">Quelle réservation annuler ?</h2>
-              <div className="space-y-3">
-                {RESERVATIONS_CLIENT.map(r => {
-                  const c = calculerRemboursement(r)
-                  return (
-                    <label
-                      key={r.id}
-                      className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                        reservationId === r.id ? 'border-blue-500 bg-blue-50' : 'border-gray-100 hover:border-gray-200'
-                      }`}
-                    >
-                      <input
-                        type="radio" name="reservation" value={r.id}
-                        checked={reservationId === r.id}
-                        onChange={() => setReservationId(r.id)}
-                        className="mt-1"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-800 text-sm">{r.hotelNom}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {new Date(r.dateArrivee).toLocaleDateString('fr-FR')} → {new Date(r.dateDepart).toLocaleDateString('fr-FR')}
-                        </p>
-                        <p className="text-xs font-semibold text-blue-600 mt-1">{r.total.toLocaleString()} FCFA · {r.id}</p>
-                        {reservationId === r.id && c && (
-                          <div className={`mt-2 text-xs px-2 py-1 rounded-lg inline-flex items-center gap-1 font-medium ${
-                            c.dans24h ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
-                          }`}>
-                            <Clock size={10} />
-                            {c.dans24h ? `Pénalité hôtel (${r.tauxPenaliteHotel}%) applicable` : 'Aucune pénalité hôtel'}
+
+              {chargement ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 size={24} className="animate-spin text-blue-500" />
+                </div>
+              ) : reservations.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-sm">Aucune réservation annulable trouvée.</p>
+                  <p className="text-xs mt-1">Seules les réservations payées et futures peuvent être annulées.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {reservations.map(r => {
+                    const c = calculerRemboursement(r)
+                    return (
+                      <label
+                        key={r.numero}
+                        className={`flex items-start gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                          reservationId === r.numero ? 'border-blue-500 bg-blue-50' : 'border-gray-100 hover:border-gray-200'
+                        }`}
+                      >
+                        <input
+                          type="radio" name="reservation" value={r.numero}
+                          checked={reservationId === r.numero}
+                          onChange={() => setReservationId(r.numero)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-800 text-sm">{r.hotelNom}</p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {new Date(r.dateArrivee).toLocaleDateString('fr-FR')} → {new Date(r.dateDepart).toLocaleDateString('fr-FR')}
+                          </p>
+                          <p className="text-xs font-semibold text-blue-600 mt-1">
+                            {r.total.toLocaleString()} FCFA · {String(r.numero).slice(0, 8).toUpperCase()}
+                          </p>
+                          {reservationId === r.numero && c && (
+                            <div className={`mt-2 text-xs px-2 py-1 rounded-lg inline-flex items-center gap-1 font-medium ${
+                              c.dans24h ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+                            }`}>
+                              <Clock size={10} />
+                              {c.dans24h ? `Pénalité hôtel (${r.tauxPenaliteHotel}%) applicable` : 'Aucune pénalité hôtel'}
+                            </div>
+                          )}
+                        </div>
+                        {reservationId === r.numero && c && !c.depasse && (
+                          <div className="text-right shrink-0">
+                            <p className="text-xs text-gray-400">Vous recevez</p>
+                            <p className="font-bold text-sm text-green-600">{c.remboursement.toLocaleString()} FCFA</p>
+                            <p className="text-xs text-gray-400">sur {r.total.toLocaleString()}</p>
                           </div>
                         )}
-                      </div>
-                      {reservationId === r.id && c && !c.depasse && (
-                        <div className="text-right shrink-0">
-                          <p className="text-xs text-gray-400">Vous recevez</p>
-                          <p className="font-bold text-sm text-green-600">{c.remboursement.toLocaleString()} FCFA</p>
-                          <p className="text-xs text-gray-400">sur {r.total.toLocaleString()}</p>
-                        </div>
-                      )}
-                    </label>
-                  )
-                })}
-              </div>
+                      </label>
+                    )
+                  })}
+                </div>
+              )}
             </div>
 
-            {/* Décomposition si sélection */}
+            {/* Décomposition */}
             {reservation && calcul && !calcul.depasse && (
               <div className="bg-gray-50 rounded-2xl border border-gray-100 p-5 mb-5">
                 <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Décomposition du remboursement</h3>
@@ -235,8 +287,8 @@ export default function Remboursement() {
               </div>
             )}
 
-            <button type="submit"
-              className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-xl transition-colors">
+            <button type="submit" disabled={chargement || reservations.length === 0}
+              className="w-full bg-red-500 hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 rounded-xl transition-colors">
               Demander l'annulation
             </button>
           </form>
@@ -257,7 +309,7 @@ export default function Remboursement() {
             <div className="space-y-3 mb-6 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">Réservation</span>
-                <span className="font-medium text-gray-800">{reservation.id}</span>
+                <span className="font-medium text-gray-800 font-mono">{String(reservation.numero).slice(0, 8).toUpperCase()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Hôtel</span>
@@ -292,13 +344,21 @@ export default function Remboursement() {
               </div>
             </div>
 
+            {erreur && (
+              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
+                <XCircle size={16} className="text-red-500" />
+                <p className="text-sm text-red-600">{erreur}</p>
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button onClick={() => setEtape('formulaire')}
                 className="flex-1 border border-gray-200 hover:bg-gray-50 text-gray-700 font-semibold py-3 rounded-xl transition-colors text-sm">
                 Retour
               </button>
-              <button onClick={() => setEtape('soumis')}
-                className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl transition-colors text-sm">
+              <button onClick={confirmerAnnulation} disabled={soumission}
+                className="flex-1 bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white font-bold py-3 rounded-xl transition-colors text-sm flex items-center justify-center gap-2">
+                {soumission && <Loader2 size={16} className="animate-spin" />}
                 Confirmer l'annulation
               </button>
             </div>

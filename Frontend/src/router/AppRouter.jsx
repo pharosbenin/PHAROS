@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ProtectedRoute } from './ProtectedRoute'
 import HotelierGuard from './HotelierGuard'
+import { HotelActifProvider } from '../context/HotelActifContext'
 
 // Pages publiques
 import Accueil from '../pages/public/Accueil'
@@ -12,6 +13,9 @@ import Confirmation from '../pages/public/Confirmation'
 import Remboursement from '../pages/public/Remboursement'
 import Connexion from '../pages/public/Connexion'
 import InscriptionHotelier from '../pages/public/InscriptionHotelier'
+import AboutPage from '../pages/public/AboutPage'
+import ContactPage from '../pages/public/ContactPage'
+import ReglesPage from '../pages/public/ReglesPage'
 
 // Pages client
 import EspaceClient from '../pages/client/EspaceClient'
@@ -33,6 +37,7 @@ import GestionUtilisateurs from '../pages/admin/GestionUtilisateurs'
 import GestionCommissions from '../pages/admin/GestionCommissions'
 import GestionEvenements from '../pages/admin/GestionEvenements'
 import Moderation from '../pages/admin/Moderation'
+import GestionMessages from '../pages/admin/GestionMessages'
 
 export default function AppRouter() {
   return (
@@ -48,6 +53,9 @@ export default function AppRouter() {
         <Route path="/remboursement" element={<Remboursement />} />
         <Route path="/connexion" element={<Connexion />} />
         <Route path="/inscription-hotelier" element={<InscriptionHotelier />} />
+        <Route path="/a-propos" element={<AboutPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/regles" element={<ReglesPage />} />
 
         {/* Client */}
         <Route path="/client/espace" element={
@@ -59,25 +67,25 @@ export default function AppRouter() {
 
         {/* Hôtelier */}
         <Route path="/hotelier/dashboard" element={
-          <ProtectedRoute role="gestionnaire"><HotelierGuard><DashboardHotelier /></HotelierGuard></ProtectedRoute>
+          <ProtectedRoute role="gestionnaire"><HotelierGuard><HotelActifProvider><DashboardHotelier /></HotelActifProvider></HotelierGuard></ProtectedRoute>
         } />
         <Route path="/hotelier/etablissement" element={
-          <ProtectedRoute role="gestionnaire"><HotelierGuard><GestionEtablissement /></HotelierGuard></ProtectedRoute>
+          <ProtectedRoute role="gestionnaire"><HotelierGuard><HotelActifProvider><GestionEtablissement /></HotelActifProvider></HotelierGuard></ProtectedRoute>
         } />
         <Route path="/hotelier/chambres" element={
-          <ProtectedRoute role="gestionnaire"><HotelierGuard><GestionChambres /></HotelierGuard></ProtectedRoute>
+          <ProtectedRoute role="gestionnaire"><HotelierGuard><HotelActifProvider><GestionChambres /></HotelActifProvider></HotelierGuard></ProtectedRoute>
         } />
         <Route path="/hotelier/restauration" element={
-          <ProtectedRoute role="gestionnaire"><HotelierGuard><GestionRestauration /></HotelierGuard></ProtectedRoute>
+          <ProtectedRoute role="gestionnaire"><HotelierGuard><HotelActifProvider><GestionRestauration /></HotelActifProvider></HotelierGuard></ProtectedRoute>
         } />
         <Route path="/hotelier/reservations" element={
-          <ProtectedRoute role="gestionnaire"><HotelierGuard><GestionReservations /></HotelierGuard></ProtectedRoute>
+          <ProtectedRoute role="gestionnaire"><HotelierGuard><HotelActifProvider><GestionReservations /></HotelActifProvider></HotelierGuard></ProtectedRoute>
         } />
         <Route path="/hotelier/avis" element={
-          <ProtectedRoute role="gestionnaire"><HotelierGuard><GestionAvis /></HotelierGuard></ProtectedRoute>
+          <ProtectedRoute role="gestionnaire"><HotelierGuard><HotelActifProvider><GestionAvis /></HotelActifProvider></HotelierGuard></ProtectedRoute>
         } />
         <Route path="/hotelier/abonnements" element={
-          <ProtectedRoute role="gestionnaire"><HotelierGuard><GestionAbonnements /></HotelierGuard></ProtectedRoute>
+          <ProtectedRoute role="gestionnaire"><HotelierGuard><HotelActifProvider><GestionAbonnements /></HotelActifProvider></HotelierGuard></ProtectedRoute>
         } />
 
         {/* Admin */}
@@ -98,6 +106,9 @@ export default function AppRouter() {
         } />
         <Route path="/admin/moderation" element={
           <ProtectedRoute role="admin"><Moderation /></ProtectedRoute>
+        } />
+        <Route path="/admin/messages" element={
+          <ProtectedRoute role="admin"><GestionMessages /></ProtectedRoute>
         } />
 
         <Route path="*" element={<Navigate to="/" replace />} />

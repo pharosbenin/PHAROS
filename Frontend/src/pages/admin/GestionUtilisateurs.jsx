@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Search, Users, Hotel, UserCheck, UserX, Mail, Phone, Calendar, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
 import SidebarAdmin from '../../components/common/SidebarAdmin'
 import api from '../../services/api'
+import usePolling from '../../hooks/usePolling'
 
 const STATUT = {
   actif: { label: 'Actif', cls: 'bg-green-100 text-green-700' },
@@ -31,7 +32,7 @@ export default function GestionUtilisateurs() {
       .finally(() => setChargement(false))
   }
 
-  useEffect(() => { charger() }, [])
+  usePolling(charger, 30000)
 
   const liste = onglet === 'clients' ? clients : gestionnaires
 

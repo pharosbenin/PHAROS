@@ -14,6 +14,12 @@ class Hotel(models.Model):
         ('freemium', 'Freemium (3%)'),
         ('pro', 'Pro (5%)'),
     ]
+    TYPES_ETABLISSEMENT = [
+        ('hotel', 'Hôtel'),
+        ('residence', 'Résidence'),
+        ('villa', 'Villa'),
+        ('auberge', 'Auberge'),
+    ]
 
     gestionnaire = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
@@ -29,6 +35,11 @@ class Hotel(models.Model):
     site_web = models.URLField(blank=True)
     statut = models.CharField(max_length=20, choices=STATUTS, default='en_attente')
     type_abonnement = models.CharField(max_length=20, choices=ABONNEMENTS, default='freemium')
+    type_etablissement = models.CharField(max_length=20, choices=TYPES_ETABLISSEMENT, default='hotel')
+    equipements = models.JSONField(default=list, blank=True)
+    taux_annulation = models.PositiveSmallIntegerField(default=20)
+    taux_modification = models.PositiveSmallIntegerField(default=10)
+    delai_gratuit = models.PositiveSmallIntegerField(default=24)
     note_moyenne = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
     nombre_avis = models.PositiveIntegerField(default=0)
     latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
@@ -168,6 +179,29 @@ class CommandeRestaurant(models.Model):
 
     def __str__(self):
         return f"Commande #{self.pk} — {self.hotel.nom}"
+
+
+class Promotion(models.Model):
+    type_chambre = models.ForeignKey(TypeChambre, on_delete=models.CASCADE, related_name='promotions')
+    titre = models.CharField(max_length=100, blank=True)
+    prix_promo = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)])
+    date_debut = models.DateField()
+    date_fin = models.DateField()
+    est_active = models.BooleanField(default=True)
+    date_creation = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date_creation']
+        verbose_name = 'Promotion'
+
+    def __str__(self):
+        return f"Promo {self.titre or self.type_chambre.nom}"
+
+    @property
+    def est_en_cours(self):
+        from django.utils import timezone
+        today = timezone.now().date()
+        return self.est_active and self.date_debut <= today <= self.date_fin
 
 
 class LigneCommande(models.Model):

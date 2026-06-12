@@ -3,6 +3,7 @@ import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { Eye, EyeOff, Mail, Lock, User, Phone, Building2, ChevronRight, AlertCircle } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
+import Layout from '../../components/common/Layout'
 
 export default function Connexion() {
   const navigate = useNavigate()
@@ -110,15 +111,9 @@ export default function Connexion() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center px-4 py-12">
+    <Layout>
+      <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center px-4 py-14">
       <div className="w-full max-w-md">
-
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-block">
-            <img src="/logo.png.jpeg" alt="PHAROS BÉNIN" className="h-28 w-auto mx-auto" />
-          </Link>
-        </div>
 
         <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
 
@@ -387,6 +382,7 @@ export default function Connexion() {
           <Link to="/" className="hover:text-blue-600 transition-colors">← Retour à l'accueil</Link>
         </p>
       </div>
-    </div>
+      </div>
+    </Layout>
   )
 }

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Search, CheckCircle, Clock, XCircle, Eye, Phone, Mail, X, AlertCircle, Banknote, Loader } from 'lucide-react'
 import SidebarHotelier from '../../components/common/SidebarHotelier'
+import { useHotelActif } from '../../context/HotelActifContext'
 import api from '../../services/api'
+import usePolling from '../../hooks/usePolling'
 
 const STATUTS = {
   en_attente:     { label: 'En attente',    cls: 'bg-amber-100 text-amber-700',   icon: Clock },
@@ -16,11 +18,12 @@ const STATUTS = {
 }
 
 const STATUTS_ACTIFS = ['payee', 'confirmee', 'en_cours', 'confirme_client', 'confirme_hotel']
-const PEUT_CONFIRMER = ['en_cours', 'confirme_client']
+const PEUT_CONFIRMER = ['payee', 'confirmee', 'en_cours', 'confirme_client']
 
 const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
 
 export default function GestionReservations() {
+  const { hotelActif } = useHotelActif()
   const [reservations, setReservations] = useState([])
   const [chargement, setChargement] = useState(true)
   const [recherche, setRecherche] = useState('')
@@ -29,24 +32,37 @@ export default function GestionReservations() {
   const [notif, setNotif] = useState(null)
   const [enConfirmation, setEnConfirmation] = useState(false)
   const [hotel, setHotel] = useState(null)
+  const [notifications, setNotifications] = useState([])
+  const [voirNotifs, setVoirNotifs] = useState(false)
+
+  const charger = async () => {
+    try {
+      const [resRes, resNotifs] = await Promise.all([
+        api.get('/gestionnaire/reservations/'),
+        api.get('/notifications/'),
+      ])
+      setHotel(hotelActif)
+      setReservations(hotelActif
+        ? resRes.data.filter(r => r.hotel_id === hotelActif.id)
+        : resRes.data)
+      setNotifications(resNotifs.data)
+    } catch (err) {
+      console.error('Erreur chargement réservations', err)
+    } finally {
+      setChargement(false)
+    }
+  }
 
   useEffect(() => {
-    async function charger() {
-      try {
-        const [resHotels, resRes] = await Promise.all([
-          api.get('/gestionnaire/hotels/'),
-          api.get('/gestionnaire/reservations/'),
-        ])
-        setHotel(resHotels.data[0] || null)
-        setReservations(resRes.data)
-      } catch (err) {
-        console.error('Erreur chargement réservations', err)
-      } finally {
-        setChargement(false)
-      }
-    }
-    charger()
-  }, [])
+    if (hotelActif) charger()
+  }, [hotelActif?.id])
+
+  usePolling(charger, 30000)
+
+  const marquerNotifLue = async (id) => {
+    await api.patch(`/notifications/${id}/lire/`).catch(() => {})
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, lu: true } : n))
+  }
 
   const afficherNotif = (msg) => {
     setNotif(msg)
@@ -87,7 +103,12 @@ export default function GestionReservations() {
     })
 
   const nbAConfirmer = reservations.filter(r => PEUT_CONFIRMER.includes(r.statut)).length
-  const escrowTotal = reservations.filter(r => !['annulee', 'remboursee'].includes(r.statut)).reduce((s, r) => s + parseFloat(r.prix_total || 0), 0)
+  const escrowTotal = reservations.reduce((sum, r) => {
+    if (['annulee', 'remboursee'].includes(r.statut)) {
+      return sum + parseFloat(r.annulation_info?.hotel_recoit || 0)
+    }
+    return sum + parseFloat(r.prix_total || 0) * (1 - taux / 100)
+  }, 0)
 
   if (chargement) return (
     <div className="flex min-h-screen bg-gray-50">
@@ -109,9 +130,48 @@ export default function GestionReservations() {
           </div>
         )}
 
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Réservations</h1>
-          <p className="text-gray-400 text-sm mt-0.5">Gérez toutes les réservations de votre établissement</p>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Réservations</h1>
+            <p className="text-gray-400 text-sm mt-0.5">Gérez toutes les réservations de votre établissement</p>
+          </div>
+          {/* Cloche notifications */}
+          <div className="relative">
+            <button onClick={() => setVoirNotifs(v => !v)}
+              className="relative p-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
+              <AlertCircle size={20} className="text-gray-600" />
+              {notifications.filter(n => !n.lu).length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                  {notifications.filter(n => !n.lu).length}
+                </span>
+              )}
+            </button>
+            {voirNotifs && (
+              <div className="absolute right-0 top-12 w-96 bg-white rounded-2xl border border-gray-100 shadow-xl z-50 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                  <p className="font-bold text-gray-900 text-sm">Notifications</p>
+                  <button onClick={() => setVoirNotifs(false)}><X size={16} className="text-gray-400 hover:text-gray-600" /></button>
+                </div>
+                <div className="max-h-80 overflow-y-auto divide-y divide-gray-50">
+                  {notifications.length === 0 ? (
+                    <p className="text-sm text-gray-400 text-center py-8">Aucune notification</p>
+                  ) : notifications.map(n => (
+                    <div key={n.id} onClick={() => marquerNotifLue(n.id)}
+                      className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${!n.lu ? 'bg-red-50' : ''}`}>
+                      <div className="flex items-start gap-3">
+                        <span className={`mt-0.5 w-2 h-2 rounded-full shrink-0 ${!n.lu ? 'bg-red-500' : 'bg-gray-300'}`} />
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-semibold ${!n.lu ? 'text-red-700' : 'text-gray-700'}`}>{n.titre}</p>
+                          <p className="text-xs text-gray-500 mt-0.5 whitespace-pre-line">{n.message}</p>
+                          <p className="text-xs text-gray-300 mt-1">{new Date(n.date_creation).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {nbAConfirmer > 0 && (
@@ -124,12 +184,11 @@ export default function GestionReservations() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-3 gap-4 mb-6">
           {[
             { label: 'Total', valeur: reservations.length, couleur: 'text-gray-800' },
             { label: 'Actives', valeur: reservations.filter(r => STATUTS_ACTIFS.includes(r.statut)).length, couleur: 'text-green-600' },
-            { label: 'En attente paiement', valeur: reservations.filter(r => r.statut === 'en_attente').length, couleur: 'text-amber-600' },
-            { label: 'Escrow total', valeur: Math.round(escrowTotal * (1 - taux / 100)).toLocaleString('fr-FR') + ' FCFA', couleur: 'text-blue-600' },
+            { label: 'Escrow total', valeur: Math.round(escrowTotal).toLocaleString('fr-FR') + ' FCFA', couleur: 'text-blue-600' },
           ].map((s, i) => (
             <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 text-center">
               <p className={`text-xl font-black ${s.couleur}`}>{s.valeur}</p>
@@ -184,6 +243,8 @@ export default function GestionReservations() {
                   const montant = parseFloat(r.prix_total || 0)
                   const commission = Math.round(montant * taux / 100)
                   const escrow = montant - commission
+                  const estAnnulee = r.statut === 'annulee' || r.statut === 'remboursee'
+                  const hotelRecoit = r.annulation_info ? r.annulation_info.hotel_recoit : 0
                   return (
                     <tr key={r.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-5 py-4">
@@ -200,8 +261,24 @@ export default function GestionReservations() {
                         <p className="text-xs text-gray-400">{formatDate(r.date_depart)} · {r.nb_nuits} nuit{r.nb_nuits > 1 ? 's' : ''}</p>
                       </td>
                       <td className="px-3 py-4 text-right">
-                        <p className="font-bold text-gray-800 text-sm">{escrow.toLocaleString('fr-FR')}</p>
-                        <p className="text-xs text-gray-300">FCFA</p>
+                        {estAnnulee ? (
+                          r.annulation_info ? (
+                            <>
+                              <p className="font-bold text-red-600 text-sm">{Math.round(hotelRecoit).toLocaleString('fr-FR')}</p>
+                              <p className="text-xs text-red-300">FCFA retenus</p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-bold text-gray-300 text-sm">—</p>
+                              <p className="text-xs text-gray-300">Annulée</p>
+                            </>
+                          )
+                        ) : (
+                          <>
+                            <p className="font-bold text-gray-800 text-sm">{escrow.toLocaleString('fr-FR')}</p>
+                            <p className="text-xs text-gray-300">FCFA</p>
+                          </>
+                        )}
                       </td>
                       <td className="px-3 py-4 text-center">
                         <span className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium ${s.cls}`}>
@@ -209,10 +286,18 @@ export default function GestionReservations() {
                         </span>
                       </td>
                       <td className="px-5 py-4 text-center">
-                        <button onClick={() => setDetail(r)}
-                          className="p-2 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 text-gray-400 hover:text-blue-600 transition-colors">
-                          <Eye size={15} />
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => setDetail(r)}
+                            className="p-2 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 text-gray-400 hover:text-blue-600 transition-colors">
+                            <Eye size={15} />
+                          </button>
+                          {PEUT_CONFIRMER.includes(r.statut) && (
+                            <button onClick={() => confirmerSejour(r)} disabled={enConfirmation}
+                              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-200 text-white text-xs font-semibold rounded-lg flex items-center gap-1.5 transition-colors">
+                              <CheckCircle size={12} /> Confirmer
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )
@@ -281,22 +366,55 @@ export default function GestionReservations() {
 
                   <div>
                     <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Paiement & Escrow</h3>
-                    <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
-                      <div className="flex justify-between text-gray-600">
-                        <span>Total payé par le client</span>
-                        <span className="font-semibold text-gray-800">{montant.toLocaleString('fr-FR')} FCFA</span>
-                      </div>
-                      <div className="border-t border-gray-200 pt-2 space-y-1.5">
-                        <div className="flex justify-between text-xs text-gray-500">
-                          <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-500 rounded-full" /> Commission PHAROS ({taux}%)</span>
-                          <span className="font-medium text-blue-600">{commission.toLocaleString('fr-FR')} FCFA</span>
+                    {(detailReserv.statut === 'annulee' || detailReserv.statut === 'remboursee') && detailReserv.annulation_info ? (
+                      <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-2 text-sm">
+                        <p className="text-xs font-bold uppercase tracking-wide text-red-600 mb-2">Détail annulation</p>
+                        <div className="flex justify-between text-gray-600">
+                          <span>Montant initial</span>
+                          <span className="font-semibold">{montant.toLocaleString('fr-FR')} FCFA</span>
                         </div>
-                        <div className="flex justify-between text-xs text-gray-500">
-                          <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-amber-500 rounded-full" /> Votre Escrow</span>
-                          <span className="font-medium text-amber-700">{escrow.toLocaleString('fr-FR')} FCFA</span>
+                        <div className="flex justify-between text-gray-600">
+                          <span>Remboursé au client</span>
+                          <span className="text-red-600 font-medium">−{Math.round(detailReserv.annulation_info.montant_rembourse).toLocaleString('fr-FR')} FCFA</span>
+                        </div>
+                        <div className="border-t border-red-100 pt-2 space-y-1.5">
+                          <div className="flex justify-between text-xs text-gray-500">
+                            <span>Frais retenus (politique hôtel)</span>
+                            <span className="font-medium">{Math.round(detailReserv.annulation_info.frais).toLocaleString('fr-FR')} FCFA</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-gray-500">
+                            <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-500 rounded-full" /> Commission PHAROS sur frais</span>
+                            <span className="font-medium text-blue-600">−{Math.round(detailReserv.annulation_info.commission).toLocaleString('fr-FR')} FCFA</span>
+                          </div>
+                          <div className="flex justify-between text-xs font-bold border-t border-red-200 pt-2">
+                            <span className="text-gray-800">Vous percevez</span>
+                            <span className="text-amber-700">{Math.round(detailReserv.annulation_info.hotel_recoit).toLocaleString('fr-FR')} FCFA</span>
+                          </div>
+                        </div>
+                        {detailReserv.annulation_info.motif && (
+                          <p className="text-xs text-gray-500 mt-1 pt-2 border-t border-red-100">
+                            Motif : {detailReserv.annulation_info.motif}
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+                        <div className="flex justify-between text-gray-600">
+                          <span>Total payé par le client</span>
+                          <span className="font-semibold text-gray-800">{montant.toLocaleString('fr-FR')} FCFA</span>
+                        </div>
+                        <div className="border-t border-gray-200 pt-2 space-y-1.5">
+                          <div className="flex justify-between text-xs text-gray-500">
+                            <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-blue-500 rounded-full" /> Commission PHAROS ({taux}%)</span>
+                            <span className="font-medium text-blue-600">{commission.toLocaleString('fr-FR')} FCFA</span>
+                          </div>
+                          <div className="flex justify-between text-xs text-gray-500">
+                            <span className="flex items-center gap-1.5"><div className="w-2 h-2 bg-amber-500 rounded-full" /> Votre Escrow</span>
+                            <span className="font-medium text-amber-700">{escrow.toLocaleString('fr-FR')} FCFA</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                     {detailReserv.statut === 'terminee' && (
                       <div className="flex items-center gap-2 mt-2 text-xs text-green-600 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
                         <Banknote size={13} /> Fonds libérés — {escrow.toLocaleString('fr-FR')} FCFA transférés sur votre compte

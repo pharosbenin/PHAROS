@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Plus, Edit3, Trash2, X, Save, BedDouble, Users, Wifi, Wind, Tv, CheckCircle, AlertCircle, Loader, Lock, Droplets, Sun, Upload } from 'lucide-react'
 import toast from 'react-hot-toast'
 import SidebarHotelier from '../../components/common/SidebarHotelier'
+import { useHotelActif } from '../../context/HotelActifContext'
 import api from '../../services/api'
 
 const resolverUrl = url => {
@@ -22,6 +23,7 @@ const EQUIPEMENTS_CHAMBRE = [
 const CHAMBRE_VIDE = { nom: '', description: '', prix_nuit: '', capacite: 2, nombre_chambres: 1, equipements: [], est_disponible: true }
 
 export default function GestionChambres() {
+  const { hotelActif } = useHotelActif()
   const [hotelId, setHotelId] = useState(null)
   const [chambres, setChambres] = useState([])
   const [chargement, setChargement] = useState(true)
@@ -36,12 +38,10 @@ export default function GestionChambres() {
 
   useEffect(() => {
     async function charger() {
+      if (!hotelActif) return
       try {
-        const res = await api.get('/gestionnaire/hotels/')
-        const hotel = res.data[0]
-        if (!hotel) return
-        setHotelId(hotel.id)
-        const resC = await api.get(`/gestionnaire/hotels/${hotel.id}/chambres/`)
+        setHotelId(hotelActif.id)
+        const resC = await api.get(`/gestionnaire/hotels/${hotelActif.id}/chambres/`)
         setChambres(resC.data)
       } catch (err) {
         console.error('Erreur chargement chambres', err)
@@ -50,7 +50,7 @@ export default function GestionChambres() {
       }
     }
     charger()
-  }, [])
+  }, [hotelActif?.id])
 
   const setChamp = (k, v) => setForm(p => ({ ...p, [k]: v }))
   const toggleEquip = (id) => setForm(p => ({

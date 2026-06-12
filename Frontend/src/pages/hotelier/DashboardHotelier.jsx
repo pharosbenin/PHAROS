@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown, Users, BedDouble, Star, CheckCircle, ChevronRight, Bell, Calendar, Loader } from 'lucide-react'
 import SidebarHotelier from '../../components/common/SidebarHotelier'
+import BanniereAttente from '../../components/common/BanniereAttente'
 import { useAuth } from '../../context/AuthContext'
+import { useHotelActif } from '../../context/HotelActifContext'
 import api from '../../services/api'
+import usePolling from '../../hooks/usePolling'
 
 const STATUT_RES = {
   confirmee:      { label: 'Confirmée',    cls: 'bg-green-100 text-green-700' },
@@ -27,6 +30,7 @@ const STATUTS_REVENUS = [...STATUTS_ACTIFS, 'terminee']
 
 export default function DashboardHotelier() {
   const { user } = useAuth()
+  const { hotelActif } = useHotelActif()
   const [periode, setPeriode] = useState('mois')
   const [chargement, setChargement] = useState(true)
   const [hotel, setHotel] = useState(null)
@@ -34,31 +38,33 @@ export default function DashboardHotelier() {
   const [avis, setAvis] = useState([])
   const [chambres, setChambres] = useState([])
 
-  useEffect(() => {
-    async function chargerDonnees() {
-      try {
-        const [resHotels, resReservations, resAvis] = await Promise.all([
-          api.get('/gestionnaire/hotels/'),
-          api.get('/gestionnaire/reservations/'),
-          api.get('/gestionnaire/avis/'),
-        ])
-        const hotelData = resHotels.data[0] || null
-        setHotel(hotelData)
-        setReservations(resReservations.data)
-        setAvis(resAvis.data)
-
-        if (hotelData) {
-          const resChambres = await api.get(`/gestionnaire/hotels/${hotelData.id}/chambres/`)
-          setChambres(resChambres.data)
-        }
-      } catch (err) {
-        console.error('Erreur chargement dashboard', err)
-      } finally {
-        setChargement(false)
-      }
+  const chargerDonnees = async () => {
+    if (!hotelActif) return
+    try {
+      const [resReservations, resAvis, resChambres] = await Promise.all([
+        api.get('/gestionnaire/reservations/'),
+        api.get('/gestionnaire/avis/'),
+        api.get(`/gestionnaire/hotels/${hotelActif.id}/chambres/`),
+      ])
+      setHotel(hotelActif)
+      setReservations(resReservations.data.filter(r => r.hotel_id === hotelActif.id))
+      setAvis(resAvis.data.filter(a => a.hotel === hotelActif.id || a.hotel_id === hotelActif.id))
+      setChambres(resChambres.data)
+    } catch (err) {
+      console.error('Erreur chargement dashboard', err)
+    } finally {
+      setChargement(false)
     }
-    chargerDonnees()
-  }, [])
+  }
+
+  useEffect(() => {
+    if (hotelActif) {
+      setChargement(true)
+      chargerDonnees()
+    }
+  }, [hotelActif?.id])
+
+  usePolling(chargerDonnees, 30000)
 
   // --- Calculs ---
   const maintenant = new Date()
@@ -126,6 +132,9 @@ export default function DashboardHotelier() {
       <SidebarHotelier />
 
       <div className="flex-1 min-w-0 p-6 lg:p-8">
+        <div className="-mx-6 lg:-mx-8 -mt-6 lg:-mt-8 mb-6">
+          <BanniereAttente hotel={hotel} />
+        </div>
 
         {/* En-tête */}
         <div className="flex items-start justify-between mb-8">

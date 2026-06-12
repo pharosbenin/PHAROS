@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.password_validation import validate_password
-from .models import CustomUser
+from .models import CustomUser, MessageContact
 
 
 class InscriptionSerializer(serializers.ModelSerializer):
@@ -50,6 +50,13 @@ class ChangerMotDePasseSerializer(serializers.Serializer):
         if attrs['nouveau_mot_de_passe'] != attrs['confirmer_mot_de_passe']:
             raise serializers.ValidationError({"nouveau_mot_de_passe": "Les mots de passe ne correspondent pas."})
         return attrs
+
+
+class MessageContactSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MessageContact
+        fields = '__all__'
+        read_only_fields = ('id', 'date_envoi', 'lu')
 
 
 class UtilisateurAdminSerializer(serializers.ModelSerializer):

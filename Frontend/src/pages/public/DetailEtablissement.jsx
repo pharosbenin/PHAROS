@@ -80,6 +80,18 @@ function mediaUrl(path) {
   return BACKEND_URL + path
 }
 
+const MOIS = ['jan.', 'fév.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sep.', 'oct.', 'nov.', 'déc.']
+
+function formatOccupation(occupation) {
+  if (!occupation) return null
+  const d1 = new Date(occupation.date_arrivee + 'T00:00:00')
+  const d2 = new Date(occupation.date_depart + 'T00:00:00')
+  const j1 = d1.getDate(), m1 = MOIS[d1.getMonth()]
+  const j2 = d2.getDate(), m2 = MOIS[d2.getMonth()]
+  if (m1 === m2) return `du ${j1} au ${j2} ${m2}`
+  return `du ${j1} ${m1} au ${j2} ${m2}`
+}
+
 function genererUrlGoogleMaps(h) {
   if (h.latitude && h.longitude) {
     return `https://maps.google.com/?q=${h.latitude},${h.longitude}`
@@ -92,8 +104,11 @@ function normaliserHotel(h) {
   const chambres = (h.types_chambres || []).map(c => ({
     ...c,
     type: c.nom,
-    prix: parseFloat(c.prix_nuit),
+    prix: c.promotion_active ? c.promotion_active.prix_promo : parseFloat(c.prix_nuit),
+    prix_original: c.promotion_active ? parseFloat(c.prix_nuit) : null,
+    promotion: c.promotion_active || null,
     dispo: c.est_disponible,
+    occupation: c.occupation_actuelle || null,
     photo: mediaUrl(c.photos?.[0]?.image),
   }))
   const equipements = [...new Set(chambres.flatMap(c => c.equipements || []))]
@@ -114,7 +129,7 @@ function normaliserHotel(h) {
     etoiles: 0,
     type: 'hôtel',
     equipements,
-    prix_min: chambres[0]?.prix || 0,
+    prix_min: chambres.filter(c => c.dispo).reduce((min, c) => Math.min(min, c.prix), Infinity) || chambres[0]?.prix || 0,
     chambres,
     avis: [],
     restaurant: null,
@@ -140,15 +155,23 @@ export default function DetailEtablissement() {
   const [dateDepart, setDateDepart] = useState('')
   const [enFavori, setEnFavori] = useState(false)
   const [erreurDates, setErreurDates] = useState(false)
+  const [signalModalOuvert, setSignalModalOuvert] = useState(false)
+  const [signalMotif, setSignalMotif] = useState('')
+  const [signalDescription, setSignalDescription] = useState('')
+  const [signalEnvoi, setSignalEnvoi] = useState(false)
+  const [signalOk, setSignalOk] = useState(false)
 
   useEffect(() => {
     async function charger() {
       try {
-        const [resHotel, resMenu] = await Promise.all([
+        const [resHotel, resMenu, resAvis] = await Promise.all([
           api.get(`/hotels/${id}/`),
           api.get(`/hotels/${id}/menu/`).catch(() => null),
+          api.get(`/hotels/${id}/avis/`).catch(() => ({ data: [] })),
         ])
-        setHotel(normaliserHotel(resHotel.data))
+        const h = normaliserHotel(resHotel.data)
+        h.avis = resAvis.data
+        setHotel(h)
         if (resMenu) setMenuHotel(resMenu.data)
       } catch {
         setErreurChargement(true)
@@ -206,10 +229,60 @@ export default function DetailEtablissement() {
 
   const ouvrirGalerie = (index) => { setGalerieIndex(index); setGalerieOuverte(true) }
 
+  const soumettrSignalement = async () => {
+    if (!signalMotif || !signalDescription.trim()) return
+    setSignalEnvoi(true)
+    try {
+      await api.post('/signalements/hotel/', { hotel: hotel.id, motif: signalMotif, description: signalDescription })
+      setSignalOk(true); setSignalModalOuvert(false)
+    } catch { /* silencieux */ } finally { setSignalEnvoi(false) }
+  }
+
   return (
     <Layout>
       {galerieOuverte && (
         <GalerieModal photos={toutesPhotos} indexDepart={galerieIndex} onClose={() => setGalerieOuverte(false)} />
+      )}
+
+      {/* Modale signalement hôtel */}
+      {signalModalOuvert && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-gray-900">Signaler cet établissement</h3>
+              <button onClick={() => setSignalModalOuvert(false)} className="text-gray-400 hover:text-gray-600">✕</button>
+            </div>
+            <p className="text-xs text-gray-400 mb-4">Votre signalement sera transmis à notre équipe de modération. Il ne sera pas visible publiquement.</p>
+            <div className="mb-3">
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">Motif</label>
+              <select value={signalMotif} onChange={e => setSignalMotif(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400">
+                <option value="">Sélectionner un motif...</option>
+                <option value="tromperie">Informations trompeuses</option>
+                <option value="hygiene">Problème d'hygiène</option>
+                <option value="securite">Problème de sécurité</option>
+                <option value="escroquerie">Escroquerie</option>
+                <option value="autre">Autre</option>
+              </select>
+            </div>
+            <div className="mb-4">
+              <label className="text-xs font-semibold text-gray-600 mb-1 block">Description</label>
+              <textarea value={signalDescription} onChange={e => setSignalDescription(e.target.value)}
+                rows={4} placeholder="Décrivez le problème en détail..."
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400 resize-none" />
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setSignalModalOuvert(false)}
+                className="flex-1 border border-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl text-sm hover:bg-gray-50">
+                Annuler
+              </button>
+              <button onClick={soumettrSignalement} disabled={!signalMotif || !signalDescription.trim() || signalEnvoi}
+                className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">
+                {signalEnvoi ? 'Envoi...' : 'Envoyer le signalement'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
@@ -326,9 +399,14 @@ export default function DetailEtablissement() {
                       )}
                       <div className="flex flex-1 p-5 justify-between gap-4">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <h3 className="font-bold text-gray-900 text-base">{chambre.type}</h3>
-                            {!chambre.dispo && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">Indisponible</span>}
+                            {!chambre.dispo && (
+                              <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">
+                                {chambre.occupation ? `Occupée ${formatOccupation(chambre.occupation)}` : 'Indisponible'}
+                              </span>
+                            )}
+                            {chambre.promotion && <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">Promo {chambre.promotion.titre ? `· ${chambre.promotion.titre}` : ''}</span>}
                           </div>
                           <p className="text-sm text-gray-500 mb-3 flex items-center gap-1">
                             <Users size={13} /> Jusqu'à {chambre.capacite} personnes
@@ -343,11 +421,19 @@ export default function DetailEtablissement() {
                         </div>
                         <div className="text-right shrink-0 flex flex-col justify-between items-end">
                           <div>
-                            <p className="text-2xl font-black text-blue-700">{chambre.prix.toLocaleString()}</p>
+                            {chambre.promotion && chambre.prix_original && (
+                              <p className="text-sm text-gray-400 line-through text-right">{Math.round(chambre.prix_original).toLocaleString()} FCFA</p>
+                            )}
+                            <p className={`text-2xl font-black ${chambre.promotion ? 'text-red-600' : 'text-blue-700'}`}>{Math.round(chambre.prix).toLocaleString()}</p>
                             <p className="text-xs text-gray-400">FCFA / nuit</p>
+                            {chambre.promotion && (
+                              <p className="text-xs text-red-500 font-medium mt-0.5">
+                                Jusqu'au {new Date(chambre.promotion.date_fin).toLocaleDateString('fr-FR')}
+                              </p>
+                            )}
                             {nuits > 0 && (
                               <p className="text-sm font-bold text-gray-700 mt-1">
-                                {(chambre.prix * nuits).toLocaleString()} FCFA
+                                {Math.round(chambre.prix * nuits).toLocaleString()} FCFA
                                 <span className="text-xs font-normal text-gray-400"> · {nuits} nuit{nuits > 1 ? 's' : ''}</span>
                               </p>
                             )}
@@ -363,7 +449,10 @@ export default function DetailEtablissement() {
                                 ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md'
                                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                               }`}>
-                              {chambre.dispo ? 'Se connecter pour réserver' : 'Indisponible'}
+                              {chambre.dispo
+                                ? 'Se connecter pour réserver'
+                                : chambre.occupation ? `Libre le ${new Date(chambre.occupation.date_depart + 'T00:00:00').getDate()} ${MOIS[new Date(chambre.occupation.date_depart + 'T00:00:00').getMonth()]}` : 'Indisponible'
+                              }
                             </button>
                           ) : (
                             <button onClick={() => chambre.dispo && handleReserver(chambre)}
@@ -372,7 +461,10 @@ export default function DetailEtablissement() {
                                 ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md'
                                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                               }`}>
-                              {chambre.dispo ? 'Je réserve' : 'Indisponible'}
+                              {chambre.dispo
+                                ? 'Je réserve'
+                                : chambre.occupation ? `Libre le ${new Date(chambre.occupation.date_depart + 'T00:00:00').getDate()} ${MOIS[new Date(chambre.occupation.date_depart + 'T00:00:00').getMonth()]}` : 'Indisponible'
+                              }
                             </button>
                           )}
                         </div>
@@ -473,11 +565,11 @@ export default function DetailEtablissement() {
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-sm">
-                          <span className="text-white font-bold">{avis.auteur.charAt(0)}</span>
+                          <span className="text-white font-bold">{(avis.client_nom || 'A').charAt(0).toUpperCase()}</span>
                         </div>
                         <div>
-                          <p className="font-bold text-sm text-gray-800">{avis.auteur}</p>
-                          <p className="text-xs text-gray-400">{avis.ville} · {new Date(avis.date).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</p>
+                          <p className="font-bold text-sm text-gray-800">{avis.client_nom || 'Anonyme'}</p>
+                          <p className="text-xs text-gray-400">{new Date(avis.date_avis).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}</p>
                         </div>
                       </div>
                       <div className="flex gap-0.5">
@@ -486,15 +578,31 @@ export default function DetailEtablissement() {
                         ))}
                       </div>
                     </div>
-                    <p className="text-sm text-gray-600 leading-relaxed">{avis.texte}</p>
-                    {avis.reponse && (
+                    <p className="text-sm text-gray-600 leading-relaxed">{avis.commentaire}</p>
+                    {avis.reponse_gestionnaire && (
                       <div className="mt-3 pl-4 border-l-2 border-blue-300 bg-blue-50 p-3 rounded-r-xl">
                         <p className="text-xs font-bold text-blue-700 mb-1">Réponse de l'établissement</p>
-                        <p className="text-sm text-gray-600">{avis.reponse}</p>
+                        <p className="text-sm text-gray-600">{avis.reponse_gestionnaire}</p>
                       </div>
                     )}
                   </div>
                 ))}
+
+                {/* Bouton signaler l'hôtel */}
+                {user?.role === 'client' && (
+                  <div className="pt-2 border-t border-gray-100">
+                    {signalOk ? (
+                      <p className="text-xs text-green-600 flex items-center gap-1.5">
+                        <CheckCircle size={13} /> Votre signalement a été transmis à notre équipe.
+                      </p>
+                    ) : (
+                      <button onClick={() => setSignalModalOuvert(true)}
+                        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-500 transition-colors">
+                        <AlertCircle size={13} /> Signaler cet établissement
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

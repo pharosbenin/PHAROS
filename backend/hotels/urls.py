@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     # Public
+    path('hotels/villes/', views.villes_disponibles, name='villes_disponibles'),
     path('hotels/', views.RechercheHotels.as_view(), name='recherche_hotels'),
     path('hotels/<int:pk>/', views.detail_hotel, name='detail_hotel'),
     path('hotels/<int:pk>/chambres/', views.chambres_hotel, name='chambres_hotel'),
@@ -26,6 +27,10 @@ urlpatterns = [
     # Commandes restaurant (gestionnaire)
     path('gestionnaire/hotels/<int:hotel_pk>/commandes/', views.CommandesHotel.as_view(), name='commandes_hotel'),
     path('gestionnaire/commandes/<int:pk>/statut/', views.maj_statut_commande, name='maj_statut_commande'),
+
+    # Promotions (Pro)
+    path('gestionnaire/hotels/<int:hotel_pk>/promotions/', views.promotions_hotel, name='promotions_hotel'),
+    path('gestionnaire/hotels/<int:hotel_pk>/promotions/<int:promo_pk>/', views.supprimer_promotion, name='supprimer_promotion'),
 
     # Admin
     path('admin/hotels/', views.ListeHotelsAdmin.as_view(), name='admin_hotels'),

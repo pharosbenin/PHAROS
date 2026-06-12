@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Save, MapPin, Phone, Mail, Globe, Wifi, ParkingSquare, Utensils, Dumbbell, Wind, Waves, Upload, X, CheckCircle, Loader, AlertCircle } from 'lucide-react'
+import { Save, MapPin, Phone, Mail, Globe, Wifi, ParkingSquare, Utensils, Dumbbell, Wind, Waves, Upload, X, CheckCircle, Loader, AlertCircle, Percent, Tag, Plus, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import SidebarHotelier from '../../components/common/SidebarHotelier'
+import { useHotelActif } from '../../context/HotelActifContext'
 import api from '../../services/api'
 
 const resolverUrl = url => {
@@ -19,29 +20,42 @@ const EQUIPEMENTS_LISTE = [
   { id: 'piscine', label: 'Piscine', icon: Waves },
 ]
 
+const TYPES_ETABLISSEMENT = [
+  { id: 'hotel', label: 'Hôtel' },
+  { id: 'residence', label: 'Résidence' },
+  { id: 'villa', label: 'Villa' },
+  { id: 'auberge', label: 'Auberge' },
+]
+
 const VILLES = ['Cotonou', 'Porto-Novo', 'Parakou', 'Abomey-Calavi', 'Djougou', 'Bohicon', 'Kandi', 'Lokossa', 'Ouidah', 'Natitingou', 'Dassa-Zoumè', 'Abomey', 'Nikki', 'Malanville']
 
 export default function GestionEtablissement() {
+  const { hotelActif } = useHotelActif()
   const [hotelId, setHotelId] = useState(null)
-  const [form, setForm] = useState({ nom: '', description: '', ville: '', adresse: '', quartier: '', telephone: '', email: '', site_web: '' })
+  const [estPro, setEstPro] = useState(false)
+  const [chambres, setChambres] = useState([])
+  const [form, setForm] = useState({ nom: '', description: '', ville: '', adresse: '', quartier: '', telephone: '', email: '', site_web: '', type_etablissement: 'hotel', equipements: [], taux_annulation: 20, taux_modification: 10 })
   const [chargement, setChargement] = useState(true)
   const [sauvegarde, setSauvegarde] = useState(false)
   const [erreur, setErreur] = useState(null)
   const [enCours, setEnCours] = useState(false)
   const [onglet, setOnglet] = useState('infos')
   const [photos, setPhotos] = useState([])
+  const [promotions, setPromotions] = useState([])
+  const [chargementPromos, setChargementPromos] = useState(false)
+  const [formPromo, setFormPromo] = useState({ chambreId: '', prixPromo: '', dateDebut: '', dateFin: '', titre: '' })
+  const [envoiPromo, setEnvoiPromo] = useState(false)
   // photos : [{ id: number|null, url: string, uploading?: boolean, tempId?: string }]
 
   useEffect(() => {
     async function charger() {
+      if (!hotelActif) return
       try {
-        const liste = await api.get('/gestionnaire/hotels/')
-        const premier = liste.data[0]
-        if (!premier) return
-        // Charger le détail complet (inclut description, email, site_web, quartier)
-        const detail = await api.get(`/gestionnaire/hotels/${premier.id}/`)
+        const detail = await api.get(`/gestionnaire/hotels/${hotelActif.id}/`)
         const h = detail.data
         setHotelId(h.id)
+        setEstPro(h.type_abonnement === 'pro')
+        setChambres(h.types_chambres || [])
         setForm({
           nom: h.nom || '',
           description: h.description || '',
@@ -51,6 +65,10 @@ export default function GestionEtablissement() {
           telephone: h.telephone || '',
           email: h.email || '',
           site_web: h.site_web || '',
+          type_etablissement: h.type_etablissement || 'hotel',
+          equipements: h.equipements || [],
+          taux_annulation: h.taux_annulation ?? 20,
+          taux_modification: h.taux_modification ?? 10,
         })
         // Charger toutes les photos depuis PhotoHotel
         if (h.photos && h.photos.length > 0) {
@@ -66,7 +84,7 @@ export default function GestionEtablissement() {
       }
     }
     charger()
-  }, [])
+  }, [hotelActif?.id])
 
   const setChamp = (k, v) => setForm(p => ({ ...p, [k]: v }))
 
@@ -119,6 +137,10 @@ export default function GestionEtablissement() {
         telephone: form.telephone,
         email: form.email,
         site_web: form.site_web,
+        type_etablissement: form.type_etablissement,
+        equipements: form.equipements,
+        taux_annulation: form.taux_annulation,
+        taux_modification: form.taux_modification,
       })
       setSauvegarde(true)
       setTimeout(() => setSauvegarde(false), 3000)
@@ -127,6 +149,56 @@ export default function GestionEtablissement() {
     } finally {
       setEnCours(false)
     }
+  }
+
+  const chargerPromos = async () => {
+    if (!hotelId) return
+    setChargementPromos(true)
+    try {
+      const res = await api.get(`/gestionnaire/hotels/${hotelId}/promotions/`)
+      setPromotions(res.data)
+    } catch { /* ignore */ }
+    finally { setChargementPromos(false) }
+  }
+
+  useEffect(() => {
+    if (onglet === 'promotions' && hotelId) chargerPromos()
+  }, [onglet, hotelId])
+
+  const creerPromotion = async () => {
+    if (!formPromo.chambreId || !formPromo.prixPromo || !formPromo.dateDebut || !formPromo.dateFin) {
+      toast.error('Remplissez tous les champs obligatoires')
+      return
+    }
+    setEnvoiPromo(true)
+    try {
+      await api.post(`/gestionnaire/hotels/${hotelId}/promotions/`, {
+        type_chambre: parseInt(formPromo.chambreId),
+        prix_promo: parseFloat(formPromo.prixPromo),
+        date_debut: formPromo.dateDebut,
+        date_fin: formPromo.dateFin,
+        titre: formPromo.titre,
+      })
+      toast.success('Promotion créée !')
+      setFormPromo({ chambreId: '', prixPromo: '', dateDebut: '', dateFin: '', titre: '' })
+      chargerPromos()
+    } catch (err) {
+      const msg = err.response?.data
+      if (typeof msg === 'object') {
+        const first = Object.values(msg)[0]
+        toast.error(Array.isArray(first) ? first[0] : String(first))
+      } else {
+        toast.error('Erreur lors de la création')
+      }
+    } finally { setEnvoiPromo(false) }
+  }
+
+  const supprimerPromotion = async (id) => {
+    try {
+      await api.delete(`/gestionnaire/hotels/${hotelId}/promotions/${id}/`)
+      setPromotions(p => p.filter(pr => pr.id !== id))
+      toast.success('Promotion supprimée')
+    } catch { toast.error('Erreur lors de la suppression') }
   }
 
   if (chargement) return (
@@ -161,7 +233,11 @@ export default function GestionEtablissement() {
           )}
 
           <div className="flex bg-gray-100 rounded-xl p-1 mb-6 w-fit">
-            {[{ id: 'infos', label: 'Informations' }, { id: 'photos', label: 'Photos' }].map(o => (
+            {[
+              { id: 'infos', label: 'Informations' },
+              { id: 'photos', label: 'Photos' },
+              ...(estPro ? [{ id: 'promotions', label: '🏷 Promotions' }] : []),
+            ].map(o => (
               <button key={o.id} onClick={() => setOnglet(o.id)}
                 className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${onglet === o.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
                 {o.label}
@@ -212,6 +288,69 @@ export default function GestionEtablissement() {
                       className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400" />
                   </div>
                 </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 p-6">
+                <h2 className="font-bold text-gray-900 mb-5">Type d'établissement</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {TYPES_ETABLISSEMENT.map(t => (
+                    <button key={t.id} type="button"
+                      onClick={() => setChamp('type_etablissement', t.id)}
+                      className={`py-3 px-4 rounded-xl border-2 text-sm font-semibold transition-all ${form.type_etablissement === t.id ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                      {t.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 p-6">
+                <h2 className="font-bold text-gray-900 mb-5">Équipements de l'établissement</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {EQUIPEMENTS_LISTE.map(eq => {
+                    const actif = form.equipements.includes(eq.id)
+                    return (
+                      <button key={eq.id} type="button"
+                        onClick={() => setChamp('equipements', actif
+                          ? form.equipements.filter(e => e !== eq.id)
+                          : [...form.equipements, eq.id]
+                        )}
+                        className={`flex items-center gap-2 py-3 px-4 rounded-xl border-2 text-sm font-medium transition-all ${actif ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                        <eq.icon size={16} />
+                        {eq.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-amber-100 bg-amber-50 p-6">
+                <h2 className="font-bold text-gray-900 mb-1 flex items-center gap-2">
+                  <Percent size={16} className="text-amber-500" /> Politique d'annulation
+                </h2>
+                <p className="text-xs text-amber-700 mb-5">Ces taux sont appliqués automatiquement par la plateforme lors d'une annulation ou modification.</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-600 font-medium block mb-1.5">% frais d'annulation *</label>
+                    <div className="relative">
+                      <input type="number" min="0" max="100" value={form.taux_annulation}
+                        onChange={e => setChamp('taux_annulation', Math.min(100, Math.max(0, Number(e.target.value))))}
+                        className="w-full border border-gray-200 rounded-xl px-4 pr-8 py-3 text-sm outline-none focus:border-amber-400" />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600 font-medium block mb-1.5">% frais de modification *</label>
+                    <div className="relative">
+                      <input type="number" min="0" max="100" value={form.taux_modification}
+                        onChange={e => setChamp('taux_modification', Math.min(100, Math.max(0, Number(e.target.value))))}
+                        className="w-full border border-gray-200 rounded-xl px-4 pr-8 py-3 text-sm outline-none focus:border-amber-400" />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-xs text-amber-600 mt-3 bg-amber-100 rounded-lg px-3 py-2">
+                  La plateforme offre 2h après le paiement pour annuler/modifier gratuitement. Au-delà : {form.taux_annulation}% retenus sur annulation, {form.taux_modification}% sur modification à la baisse.
+                </p>
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-100 p-6">
@@ -279,13 +418,114 @@ export default function GestionEtablissement() {
             </div>
           )}
 
-          <div className="flex justify-end mt-6">
-            <button onClick={sauvegarder} disabled={enCours}
-              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${sauvegarde ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-200'}`}>
-              {enCours ? <Loader size={16} className="animate-spin" /> : sauvegarde ? <CheckCircle size={16} /> : <Save size={16} />}
-              {sauvegarde ? 'Sauvegardé !' : 'Sauvegarder les modifications'}
-            </button>
-          </div>
+          {onglet === 'promotions' && (
+            <div className="space-y-5">
+              {/* Formulaire création */}
+              <div className="bg-white rounded-2xl border border-gray-100 p-6">
+                <h2 className="font-bold text-gray-900 mb-1 flex items-center gap-2">
+                  <Plus size={16} className="text-red-500" /> Créer une promotion
+                </h2>
+                <p className="text-xs text-gray-400 mb-5">Définissez un prix réduit pour une chambre sur une période donnée. La plateforme la mettra en avant automatiquement.</p>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-gray-500 font-medium block mb-1.5">Chambre *</label>
+                      <select value={formPromo.chambreId} onChange={e => setFormPromo(p => ({ ...p, chambreId: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-red-400">
+                        <option value="">-- Choisir une chambre --</option>
+                        {chambres.map(c => (
+                          <option key={c.id} value={c.id}>{c.nom} — {Math.round(c.prix_nuit).toLocaleString('fr-FR')} FCFA/nuit</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 font-medium block mb-1.5">Prix promotionnel (FCFA) *</label>
+                      <input type="number" min="0" value={formPromo.prixPromo}
+                        onChange={e => setFormPromo(p => ({ ...p, prixPromo: e.target.value }))}
+                        placeholder="Ex: 25000"
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-red-400" />
+                      {formPromo.chambreId && formPromo.prixPromo && (
+                        <p className="text-xs mt-1 text-red-500 font-medium">
+                          Réduction : {Math.round((1 - parseFloat(formPromo.prixPromo) / parseFloat(chambres.find(c => String(c.id) === formPromo.chambreId)?.prix_nuit || 1)) * 100)}%
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs text-gray-500 font-medium block mb-1.5">Date de début *</label>
+                      <input type="date" value={formPromo.dateDebut}
+                        onChange={e => setFormPromo(p => ({ ...p, dateDebut: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-red-400" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-500 font-medium block mb-1.5">Date de fin *</label>
+                      <input type="date" value={formPromo.dateFin}
+                        onChange={e => setFormPromo(p => ({ ...p, dateFin: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-red-400" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 font-medium block mb-1.5">Titre (optionnel)</label>
+                    <input type="text" value={formPromo.titre}
+                      onChange={e => setFormPromo(p => ({ ...p, titre: e.target.value }))}
+                      placeholder="Ex: Offre Fête Nationale, Promo Weekend..."
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-red-400" />
+                  </div>
+                  <button onClick={creerPromotion} disabled={envoiPromo}
+                    className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:bg-gray-200">
+                    {envoiPromo ? <Loader size={15} className="animate-spin" /> : <Tag size={15} />}
+                    Créer la promotion
+                  </button>
+                </div>
+              </div>
+
+              {/* Liste des promotions */}
+              <div className="bg-white rounded-2xl border border-gray-100 p-6">
+                <h2 className="font-bold text-gray-900 mb-5">Promotions existantes</h2>
+                {chargementPromos ? (
+                  <div className="flex justify-center py-8"><Loader size={24} className="animate-spin text-gray-400" /></div>
+                ) : promotions.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-6">Aucune promotion créée pour le moment.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {promotions.map(pr => (
+                      <div key={pr.id} className={`flex items-center justify-between p-4 rounded-xl border ${pr.est_en_cours ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-gray-50'}`}>
+                        <div>
+                          <div className="flex items-center gap-2 mb-0.5">
+                            {pr.est_en_cours && <span className="text-xs bg-red-500 text-white font-bold px-2 py-0.5 rounded-full">En cours</span>}
+                            <p className="text-sm font-semibold text-gray-800">{pr.chambre_nom}</p>
+                            {pr.titre && <span className="text-xs text-gray-500">— {pr.titre}</span>}
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            <span className="line-through text-gray-400">{Math.round(pr.prix_original).toLocaleString('fr-FR')} FCFA</span>
+                            {' → '}
+                            <span className="text-red-600 font-bold">{Math.round(pr.prix_promo).toLocaleString('fr-FR')} FCFA</span>
+                            {' · '}
+                            {new Date(pr.date_debut).toLocaleDateString('fr-FR')} au {new Date(pr.date_fin).toLocaleDateString('fr-FR')}
+                          </p>
+                        </div>
+                        <button onClick={() => supprimerPromotion(pr.id)}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {onglet !== 'promotions' && (
+            <div className="flex justify-end mt-6">
+              <button onClick={sauvegarder} disabled={enCours}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm transition-all ${sauvegarde ? 'bg-green-500 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-200'}`}>
+                {enCours ? <Loader size={16} className="animate-spin" /> : sauvegarde ? <CheckCircle size={16} /> : <Save size={16} />}
+                {sauvegarde ? 'Sauvegardé !' : 'Sauvegarder les modifications'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

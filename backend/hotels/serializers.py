@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Hotel, TypeChambre, PhotoHotel, PhotoChambre, PlatMenu, CommandeRestaurant, LigneCommande
+from .models import Hotel, TypeChambre, PhotoHotel, PhotoChambre, PlatMenu, CommandeRestaurant, LigneCommande, Promotion
 
 
 class PhotoHotelSerializer(serializers.ModelSerializer):
@@ -14,14 +14,70 @@ class PhotoChambreSerializer(serializers.ModelSerializer):
         fields = ('id', 'image', 'legende', 'ordre')
 
 
+class PromotionSerializer(serializers.ModelSerializer):
+    est_en_cours = serializers.ReadOnlyField()
+    chambre_nom = serializers.CharField(source='type_chambre.nom', read_only=True)
+    prix_original = serializers.DecimalField(source='type_chambre.prix_nuit', max_digits=10, decimal_places=2, read_only=True)
+
+    class Meta:
+        model = Promotion
+        fields = ('id', 'type_chambre', 'chambre_nom', 'prix_original', 'titre',
+                  'prix_promo', 'date_debut', 'date_fin', 'est_active', 'est_en_cours', 'date_creation')
+        read_only_fields = ('id', 'date_creation', 'est_en_cours', 'chambre_nom', 'prix_original')
+
+    def validate(self, attrs):
+        if attrs.get('date_fin') and attrs.get('date_debut'):
+            if attrs['date_fin'] < attrs['date_debut']:
+                raise serializers.ValidationError({'date_fin': "La date de fin doit être après la date de début."})
+        if attrs.get('prix_promo') and attrs.get('type_chambre'):
+            if attrs['prix_promo'] >= attrs['type_chambre'].prix_nuit:
+                raise serializers.ValidationError({'prix_promo': "Le prix promo doit être inférieur au prix normal."})
+        return attrs
+
+
 class TypeChambreSerializer(serializers.ModelSerializer):
     photos = PhotoChambreSerializer(many=True, read_only=True)
+    promotion_active = serializers.SerializerMethodField()
+    occupation_actuelle = serializers.SerializerMethodField()
+
+    def get_promotion_active(self, obj):
+        from django.utils import timezone
+        today = timezone.now().date()
+        promo = obj.promotions.filter(
+            est_active=True, date_debut__lte=today, date_fin__gte=today
+        ).first()
+        if promo:
+            return {
+                'id': promo.id,
+                'titre': promo.titre,
+                'prix_promo': float(promo.prix_promo),
+                'date_fin': promo.date_fin.isoformat(),
+            }
+        return None
+
+    def get_occupation_actuelle(self, obj):
+        if obj.est_disponible:
+            return None
+        from django.utils import timezone
+        from reservations.models import Reservation
+        today = timezone.now().date()
+        res = Reservation.objects.filter(
+            type_chambre=obj,
+            statut__in=['payee', 'confirmee', 'en_cours', 'confirme_client', 'confirme_hotel'],
+            date_depart__gt=today,
+        ).order_by('date_arrivee').first()
+        if res:
+            return {
+                'date_arrivee': res.date_arrivee.isoformat(),
+                'date_depart': res.date_depart.isoformat(),
+            }
+        return None
 
     class Meta:
         model = TypeChambre
         fields = ('id', 'hotel', 'nom', 'description', 'capacite', 'prix_nuit',
                   'prix_weekend', 'superficie', 'nombre_chambres', 'equipements',
-                  'est_disponible', 'photos', 'date_creation')
+                  'est_disponible', 'photos', 'promotion_active', 'occupation_actuelle', 'date_creation')
         read_only_fields = ('id', 'date_creation')
 
 
@@ -36,15 +92,9 @@ class TypeChambreEcrireSerializer(serializers.ModelSerializer):
 class HotelListeSerializer(serializers.ModelSerializer):
     photo_principale = serializers.ImageField(read_only=True)
     gestionnaire_nom = serializers.CharField(source='gestionnaire.nom_complet', read_only=True)
-    prix_min = serializers.SerializerMethodField()
     etoiles = serializers.SerializerMethodField()
 
-    def get_prix_min(self, obj):
-        chambre = obj.types_chambres.filter(est_disponible=True).order_by('prix_nuit').first()
-        return float(chambre.prix_nuit) if chambre else None
-
     def get_etoiles(self, obj):
-        # Basé sur la note moyenne : 0-2→0, 2-3→2, 3-4→3, 4-4.5→4, 4.5+→5
         note = float(obj.note_moyenne or 0)
         if note >= 4.5: return 5
         if note >= 4.0: return 4
@@ -52,11 +102,34 @@ class HotelListeSerializer(serializers.ModelSerializer):
         if note >= 2.0: return 2
         return 0
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        from django.utils import timezone
+        today = timezone.now().date()
+        prix_min = None
+        prix_min_original = None
+        a_promotion = False
+        for chambre in instance.types_chambres.filter(est_disponible=True):
+            prix = float(chambre.prix_nuit)
+            promo = chambre.promotions.filter(
+                est_active=True, date_debut__lte=today, date_fin__gte=today
+            ).first()
+            prix_eff = float(promo.prix_promo) if promo else prix
+            if prix_min is None or prix_eff < prix_min:
+                prix_min = prix_eff
+                prix_min_original = prix if promo else None
+                a_promotion = bool(promo)
+        data['prix_min'] = prix_min
+        data['prix_min_original'] = prix_min_original
+        data['a_promotion'] = a_promotion
+        return data
+
     class Meta:
         model = Hotel
         fields = ('id', 'nom', 'adresse', 'ville', 'quartier', 'telephone',
-                  'type_abonnement', 'statut', 'note_moyenne', 'nombre_avis',
-                  'photo_principale', 'gestionnaire_nom', 'prix_min', 'etoiles')
+                  'type_abonnement', 'type_etablissement', 'equipements', 'statut',
+                  'note_moyenne', 'nombre_avis', 'photo_principale', 'gestionnaire_nom',
+                  'etoiles', 'taux_annulation', 'taux_modification', 'delai_gratuit')
 
 
 class HotelDetailSerializer(serializers.ModelSerializer):
@@ -68,9 +141,10 @@ class HotelDetailSerializer(serializers.ModelSerializer):
         model = Hotel
         fields = ('id', 'nom', 'description', 'adresse', 'ville', 'quartier',
                   'telephone', 'email', 'site_web', 'latitude', 'longitude',
-                  'type_abonnement', 'statut', 'note_moyenne', 'nombre_avis',
-                  'photo_principale', 'photos', 'types_chambres',
-                  'gestionnaire_nom', 'date_creation')
+                  'type_abonnement', 'type_etablissement', 'equipements', 'statut',
+                  'note_moyenne', 'nombre_avis', 'photo_principale', 'photos',
+                  'types_chambres', 'gestionnaire_nom', 'date_creation',
+                  'taux_annulation', 'taux_modification', 'delai_gratuit')
 
 
 class HotelCreerSerializer(serializers.ModelSerializer):
@@ -78,6 +152,8 @@ class HotelCreerSerializer(serializers.ModelSerializer):
         model = Hotel
         fields = ('id', 'nom', 'description', 'adresse', 'ville', 'quartier',
                   'telephone', 'email', 'site_web', 'latitude', 'longitude',
+                  'type_etablissement', 'equipements',
+                  'taux_annulation', 'taux_modification', 'delai_gratuit',
                   'photo_principale', 'document_registre')
         read_only_fields = ('id',)
 

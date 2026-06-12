@@ -53,11 +53,54 @@ class GestionEvenements(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated, EstAdmin]
     queryset = EvenementNational.objects.all()
 
+    def perform_create(self, serializer):
+        evenement = serializer.save()
+        self._sync_mises_en_avant(evenement)
+
+    def _sync_mises_en_avant(self, evenement):
+        from hotels.models import Hotel
+        hotels_pro = Hotel.objects.filter(
+            statut='valide',
+            ville__in=evenement.villes_concernees,
+            type_abonnement='pro',
+        ).order_by('-note_moyenne')
+        for i, hotel in enumerate(hotels_pro):
+            MiseEnAvantHotel.objects.update_or_create(
+                evenement=evenement,
+                hotel=hotel,
+                defaults={
+                    'position_boost': i,
+                    'date_boost_debut': evenement.date_debut,
+                    'date_boost_fin': evenement.date_fin,
+                    'est_actif': True,
+                }
+            )
+
 
 class DetailEvenementAdmin(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = EvenementSerializer
     permission_classes = [IsAuthenticated, EstAdmin]
     queryset = EvenementNational.objects.all()
+
+    def perform_update(self, serializer):
+        evenement = serializer.save()
+        # Re-sync si les villes ou les dates ont changé
+        MiseEnAvantHotel.objects.filter(evenement=evenement).delete()
+        from hotels.models import Hotel
+        hotels_pro = Hotel.objects.filter(
+            statut='valide',
+            ville__in=evenement.villes_concernees,
+            type_abonnement='pro',
+        ).order_by('-note_moyenne')
+        for i, hotel in enumerate(hotels_pro):
+            MiseEnAvantHotel.objects.create(
+                evenement=evenement,
+                hotel=hotel,
+                position_boost=i,
+                date_boost_debut=evenement.date_debut,
+                date_boost_fin=evenement.date_fin,
+                est_actif=True,
+            )
 
 
 @api_view(['POST'])

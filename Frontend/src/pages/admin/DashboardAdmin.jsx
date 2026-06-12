@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { TrendingUp, TrendingDown, Hotel, Users, BookOpen, Percent, Clock, CheckCircle, XCircle, AlertTriangle, ChevronRight, Bell, Loader } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import SidebarAdmin from '../../components/common/SidebarAdmin'
 import api from '../../services/api'
+import usePolling from '../../hooks/usePolling'
 
 export default function DashboardAdmin() {
   const navigate = useNavigate()
@@ -10,7 +11,7 @@ export default function DashboardAdmin() {
   const [chargement, setChargement] = useState(true)
   const [stats, setStats] = useState({ hotels: [], users: [], commissions: null, reservations: [] })
 
-  useEffect(() => {
+  const charger = () => {
     Promise.all([
       api.get('/admin/hotels/'),
       api.get('/admin/utilisateurs/'),
@@ -27,7 +28,9 @@ export default function DashboardAdmin() {
       })
       .catch(console.error)
       .finally(() => setChargement(false))
-  }, [])
+  }
+
+  usePolling(charger, 30000)
 
   const hotels = stats.hotels || []
   const users = stats.users || []

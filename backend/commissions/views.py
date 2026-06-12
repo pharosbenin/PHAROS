@@ -15,9 +15,12 @@ from .serializers import AbonnementSerializer, CommissionSerializer, DemandeUpgr
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, EstGestionnaire, EstNonSuspendu])
 def mon_abonnement(request):
-    try:
-        hotel = Hotel.objects.get(gestionnaire=request.user)
-    except Hotel.DoesNotExist:
+    hotel_id = request.query_params.get('hotel_id')
+    if hotel_id:
+        hotel = Hotel.objects.filter(pk=hotel_id, gestionnaire=request.user).first()
+    else:
+        hotel = Hotel.objects.filter(gestionnaire=request.user).first()
+    if not hotel:
         return Response({'detail': 'Vous n\'avez pas encore d\'hôtel enregistré.'}, status=status.HTTP_404_NOT_FOUND)
 
     abonnement = Abonnement.objects.filter(hotel=hotel, statut='actif').first()
@@ -42,9 +45,12 @@ def mon_abonnement(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, EstGestionnaire, EstNonSuspendu])
 def upgrader_pro(request):
-    try:
-        hotel = Hotel.objects.get(gestionnaire=request.user, statut='valide')
-    except Hotel.DoesNotExist:
+    hotel_id = request.data.get('hotel_id')
+    if hotel_id:
+        hotel = Hotel.objects.filter(pk=hotel_id, gestionnaire=request.user, statut='valide').first()
+    else:
+        hotel = Hotel.objects.filter(gestionnaire=request.user, statut='valide').first()
+    if not hotel:
         return Response({'detail': 'Hôtel validé introuvable.'}, status=status.HTTP_404_NOT_FOUND)
 
     if hotel.type_abonnement == 'pro':
@@ -63,9 +69,12 @@ def upgrader_pro(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated, EstGestionnaire, EstNonSuspendu])
 def mes_commissions(request):
-    try:
-        hotel = Hotel.objects.get(gestionnaire=request.user)
-    except Hotel.DoesNotExist:
+    hotel_id = request.query_params.get('hotel_id')
+    if hotel_id:
+        hotel = Hotel.objects.filter(pk=hotel_id, gestionnaire=request.user).first()
+    else:
+        hotel = Hotel.objects.filter(gestionnaire=request.user).first()
+    if not hotel:
         return Response({'detail': 'Hôtel introuvable.'}, status=status.HTTP_404_NOT_FOUND)
     commissions = Commission.objects.filter(hotel=hotel)
     total = sum(c.montant_hotel for c in commissions)

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import usePolling from '../../hooks/usePolling'
 import { Link, useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import {
@@ -9,131 +10,6 @@ import {
 import Layout from '../../components/common/Layout'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
-
-const RESERVATIONS_INIT = [
-  {
-    id: 'RES-2026-001234',
-    hotelId: 1,
-    hotelNom: 'Hôtel du Lac',
-    hotelVille: 'Cotonou',
-    hotelPhoto: '/hotels/hotel-du-lac/exterieur/HL1.jpeg',
-    dateArrivee: '2026-06-10',
-    dateDepart: '2026-06-12',
-    nuits: 2,
-    voyageurs: 1,
-    chambres: [{ type: 'Chambre Standard', quantite: 1, prix: 25000 }],
-    total: 50000,
-    statut: 'confirmee',
-    methode: 'MTN Mobile Money',
-    commissionTaux: 3,
-    tauxPenaliteHotel: 25,
-    paiementRecent: false,
-    chambresDisponibles: [
-      { id: 1, type: 'Chambre Standard', prix: 25000, capacite: 2 },
-      { id: 2, type: 'Chambre Supérieure', prix: 35000, capacite: 3 },
-      { id: 3, type: 'Suite Junior', prix: 55000, capacite: 2 },
-    ],
-  },
-  {
-    id: 'RES-2026-000891',
-    hotelId: 2,
-    hotelNom: 'Villa Ouidah Heritage',
-    hotelVille: 'Ouidah',
-    hotelPhoto: '/hotels/villa-ouidah-heritage/exterieur/VO1.jpeg',
-    dateArrivee: '2026-07-15',
-    dateDepart: '2026-07-18',
-    nuits: 3,
-    voyageurs: 2,
-    chambres: [{ type: 'Suite Exécutive', quantite: 1, prix: 80000 }],
-    total: 240000,
-    statut: 'en_attente',
-    methode: 'Moov Money',
-    commissionTaux: 5,
-    tauxPenaliteHotel: 30,
-    paiementRecent: true,
-    chambresDisponibles: [
-      { id: 1, type: 'Chambre Deluxe', prix: 55000, capacite: 2 },
-      { id: 2, type: 'Suite Junior', prix: 70000, capacite: 3 },
-      { id: 3, type: 'Suite Exécutive', prix: 80000, capacite: 4 },
-    ],
-  },
-  {
-    id: 'RES-2026-002100',
-    hotelId: 3,
-    hotelNom: 'Grand Hôtel de Parakou',
-    hotelVille: 'Parakou',
-    hotelPhoto: '/hotels/grand-hotel-parakou/exterieur/GP1.jpeg',
-    dateArrivee: '2026-05-28',
-    dateDepart: '2026-05-30',
-    nuits: 2,
-    voyageurs: 1,
-    chambres: [{ type: 'Chambre Supérieure', quantite: 1, prix: 30000 }],
-    total: 60000,
-    statut: 'a_confirmer',
-    methode: 'MTN Mobile Money',
-    commissionTaux: 3,
-    tauxPenaliteHotel: 20,
-    paiementRecent: false,
-    chambresDisponibles: [],
-  },
-  {
-    id: 'RES-2026-002050',
-    hotelId: 4,
-    hotelNom: 'Résidence Bénin Palace',
-    hotelVille: 'Cotonou',
-    hotelPhoto: '/hotels/residence-benin-palace/exterieur/BP1.jpeg',
-    dateArrivee: '2026-05-20',
-    dateDepart: '2026-05-22',
-    nuits: 2,
-    voyageurs: 2,
-    chambres: [{ type: 'Suite Junior', quantite: 1, prix: 45000 }],
-    total: 90000,
-    statut: 'confirme_hotel',
-    methode: 'Moov Money',
-    commissionTaux: 5,
-    tauxPenaliteHotel: 20,
-    paiementRecent: false,
-    chambresDisponibles: [],
-  },
-  {
-    id: 'RES-2025-008812',
-    hotelId: 5,
-    hotelNom: 'Grand Hôtel de Dassa',
-    hotelVille: 'Dassa-Zoumè',
-    hotelPhoto: '/hotels/grand-hotel-dassa/exterieur/GD1.jpeg',
-    dateArrivee: '2025-12-24',
-    dateDepart: '2025-12-27',
-    nuits: 3,
-    voyageurs: 2,
-    chambres: [{ type: 'Chambre Supérieure', quantite: 2, prix: 35000 }],
-    total: 210000,
-    statut: 'terminee',
-    methode: 'MTN Mobile Money',
-    commissionTaux: 3,
-    tauxPenaliteHotel: 25,
-    paiementRecent: false,
-    chambresDisponibles: [],
-  },
-  {
-    id: 'RES-2025-005541',
-    hotelId: 6,
-    hotelNom: 'Résidence Palm Beach',
-    hotelVille: 'Cotonou',
-    hotelPhoto: '/hotels/residence-palm-beach/exterieur/PB1.jpeg',
-    dateArrivee: '2025-08-01',
-    dateDepart: '2025-08-03',
-    nuits: 2,
-    voyageurs: 1,
-    chambres: [{ type: 'Chambre Standard', quantite: 1, prix: 18000 }],
-    total: 36000,
-    statut: 'annulee',
-    methode: 'MTN Mobile Money',
-    commissionTaux: 3,
-    tauxPenaliteHotel: 20,
-    paiementRecent: false,
-    chambresDisponibles: [],
-  },
-]
 
 const STATUTS = {
   en_attente: { label: 'En attente', couleur: 'bg-amber-100 text-amber-700', icon: Clock },
@@ -157,70 +33,75 @@ function QRMini({ valeur }) {
 }
 
 function ModalModification({ reservation, onFermer, onValider }) {
-  const now = new Date()
-  const arrivee = new Date(reservation.dateArrivee)
-  const heuresAvantArrivee = (arrivee - now) / 3600000
-  const peutModifier = heuresAvantArrivee > 24
+  const today = new Date().toISOString().split('T')[0]
+  const bloque = today >= reservation.dateArrivee
 
-  const chambreActuelle = reservation.chambres[0]
-  const [chambresDisponibles, setChambresDisponibles] = useState(reservation.chambresDisponibles)
-  const [loadingChambres, setLoadingChambres] = useState(false)
-  const [selectedChambre, setSelectedChambre] = useState(
-    reservation.chambresDisponibles.find(c => c.type === chambreActuelle.type) ||
-    reservation.chambresDisponibles[0] || null
-  )
+  const totalActuel = reservation.total
+  const prixNuitActuel = totalActuel / reservation.nuits
+  const datePaiement = reservation.datePaiement ? new Date(reservation.datePaiement) : null
+  const heuresDepuisPaiement = datePaiement ? (Date.now() - datePaiement.getTime()) / 3600000 : Infinity
+  const dansFenetre2h = heuresDepuisPaiement <= 2
+
+  const [chambres, setChambres] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [selectedId, setSelectedId] = useState('same')
   const [dateArrivee, setDateArrivee] = useState(reservation.dateArrivee)
   const [dateDepart, setDateDepart] = useState(reservation.dateDepart)
-  const [voyageurs, setVoyageurs] = useState(reservation.voyageurs || 1)
+  const [envoi, setEnvoi] = useState(false)
+  const [erreur, setErreur] = useState('')
   const [telephone, setTelephone] = useState('')
+  const [methode, setMethode] = useState('mtn')
 
   useEffect(() => {
-    if (!dateArrivee || !dateDepart || !reservation.hotelId || dateArrivee >= dateDepart) return
-    setLoadingChambres(true)
-    api.get('/chambres/disponibles/', {
-      params: { hotel: reservation.hotelId, arrivee: dateArrivee, depart: dateDepart }
-    })
-      .then(res => {
-        const chambres = res.data
-        setChambresDisponibles(chambres)
-        const memeType = chambres.find(c => c.type === chambreActuelle.type)
-        setSelectedChambre(memeType || chambres[0] || null)
-      })
-      .catch(() => setChambresDisponibles(reservation.chambresDisponibles))
-      .finally(() => setLoadingChambres(false))
-  }, [dateArrivee, dateDepart])
+    if (bloque) return
+    api.get(`/hotels/${reservation.hotelId}/`)
+      .then(res => setChambres(res.data.types_chambres || []))
+      .catch(() => setChambres([]))
+      .finally(() => setLoading(false))
+  }, [])
 
-  const minDateArrivee = new Date(Date.now() + 25 * 3600000).toISOString().split('T')[0]
+  const nouvellesNuits = dateArrivee && dateDepart
+    ? Math.max(1, Math.round((new Date(dateDepart) - new Date(dateArrivee)) / 86400000))
+    : reservation.nuits
 
-  const nuits = dateArrivee && dateDepart
-    ? Math.max(0, Math.round((new Date(dateDepart) - new Date(dateArrivee)) / 86400000))
-    : 0
+  const chambreChoisie = selectedId === 'same'
+    ? { id: reservation.typeChambreId, nom: reservation.typeChambreNom, prix_nuit: prixNuitActuel }
+    : chambres.find(c => c.id === selectedId)
 
-  const prixChambre = selectedChambre?.prix || chambreActuelle.prix
-  const newTotal = nuits > 0 ? prixChambre * nuits : 0
-  const oldTotal = reservation.total
-  const diff = newTotal - oldTotal
-  const isHausse = diff > 0
-  const isBaisse = diff < 0
+  const prixNuitChoisi = chambreChoisie ? parseFloat(chambreChoisie.prix_nuit) : prixNuitActuel
+  const nouveauTotal = prixNuitChoisi * nouvellesNuits
+  const aChange = selectedId !== 'same' || dateArrivee !== reservation.dateArrivee || dateDepart !== reservation.dateDepart
+  const estHausse = nouveauTotal > totalActuel
+  const difference = Math.abs(nouveauTotal - totalActuel)
+  const fraisModif = (!estHausse && !dansFenetre2h) ? Math.round(difference * reservation.tauxModification / 100) : 0
+  const remboursement = estHausse ? 0 : (difference - fraisModif)
+  const supplement = estHausse ? difference : 0
 
-  const commissionDiff = Math.round(Math.abs(diff) * reservation.commissionTaux / 100)
-  const escrowDiff = Math.abs(diff) - commissionDiff
-  const penalite = isBaisse
-    ? (reservation.paiementRecent ? 0 : Math.round(escrowDiff * reservation.tauxPenaliteHotel / 100))
-    : 0
-  const remboursement = isBaisse
-    ? (reservation.paiementRecent ? Math.abs(diff) : escrowDiff - penalite)
-    : 0
+  const handleConfirmer = async () => {
+    if (!aChange) { setErreur('Aucune modification détectée.'); return }
+    if (!telephone.trim()) { setErreur('Veuillez indiquer votre numéro Mobile Money.'); return }
+    setEnvoi(true)
+    setErreur('')
+    const payload = {
+      numero_telephone: telephone.trim(),
+      methode_paiement: methode,
+    }
+    if (selectedId !== 'same') payload.type_chambre_nouveau = selectedId
+    if (dateArrivee !== reservation.dateArrivee || dateDepart !== reservation.dateDepart) {
+      payload.date_arrivee_nouvelle = dateArrivee
+      payload.date_depart_nouvelle = dateDepart
+    }
+    try {
+      const res = await api.post(`/reservations/${reservation.id}/modifier/`, payload)
+      onValider(res.data, chambreChoisie)
+    } catch (err) {
+      setErreur(err.response?.data?.detail || 'Une erreur est survenue.')
+    } finally {
+      setEnvoi(false)
+    }
+  }
 
-  const somethingChanged =
-    dateArrivee !== reservation.dateArrivee ||
-    dateDepart !== reservation.dateDepart ||
-    (selectedChambre && selectedChambre.type !== chambreActuelle.type) ||
-    voyageurs !== (reservation.voyageurs || 1)
-
-  const formValide = nuits > 0 && somethingChanged && (!isHausse || telephone.length >= 8) && !loadingChambres
-
-  if (!peutModifier) {
+  if (bloque) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
@@ -231,8 +112,8 @@ function ModalModification({ reservation, onFermer, onValider }) {
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
             <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-red-700 text-sm">Délai dépassé</p>
-              <p className="text-xs text-red-600 mt-1">La modification n'est plus possible à moins de 24h de la date d'arrivée.</p>
+              <p className="font-semibold text-red-700 text-sm">Modification bloquée</p>
+              <p className="text-xs text-red-600 mt-1">Aucune modification n'est possible le jour d'arrivée ou après.</p>
             </div>
           </div>
           <button onClick={onFermer} className="w-full mt-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-xl text-sm transition-colors">Fermer</button>
@@ -253,171 +134,148 @@ function ModalModification({ reservation, onFermer, onValider }) {
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Règle 2h */}
-          <div className={`rounded-xl p-3 text-xs flex items-start gap-2 ${reservation.paiementRecent ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}>
-            <Info size={14} className="shrink-0 mt-0.5" />
-            {reservation.paiementRecent
-              ? 'Paiement effectué il y a moins de 2h — toute réduction sera remboursée intégralement, sans pénalité.'
-              : `Règle de modification : en cas de réduction, une pénalité de ${reservation.tauxPenaliteHotel}% définie par l'hôtel sera retenue.`}
-          </div>
-
-          {/* Chambre */}
-          <div>
-            <label className="text-xs text-gray-500 font-semibold block mb-1.5">Type de chambre</label>
-            {loadingChambres ? (
-              <div className="w-full border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-2 text-sm text-gray-400">
-                <Loader2 size={14} className="animate-spin" />
-                Chargement des chambres disponibles...
-              </div>
-            ) : chambresDisponibles.length > 0 ? (
-              <select
-                value={selectedChambre?.id || ''}
-                onChange={e => setSelectedChambre(chambresDisponibles.find(c => c.id === parseInt(e.target.value)))}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:border-blue-400 bg-white"
-              >
-                {chambresDisponibles.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.type} — {c.prix.toLocaleString()} FCFA/nuit (max {c.capacite} pers.)
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <div className="w-full border border-orange-200 bg-orange-50 rounded-xl px-4 py-3 text-sm text-orange-600">
-                Aucune autre chambre disponible pour ces dates
-              </div>
-            )}
-            <p className="text-xs text-gray-400 mt-1">Actuellement : {chambreActuelle.type} — {chambreActuelle.prix.toLocaleString()} FCFA/nuit</p>
-          </div>
 
           {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-500 font-semibold block mb-1.5">Date d'arrivée</label>
-              <input type="date" value={dateArrivee}
-                min={minDateArrivee}
-                onChange={e => { setDateArrivee(e.target.value); if (dateDepart <= e.target.value) setDateDepart('') }}
+              <label className="text-xs text-gray-500 font-semibold block mb-1.5">Arrivée</label>
+              <input type="date" value={dateArrivee} min={today}
+                onChange={e => setDateArrivee(e.target.value)}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400" />
             </div>
             <div>
-              <label className="text-xs text-gray-500 font-semibold block mb-1.5">Date de départ</label>
-              <input type="date" value={dateDepart}
-                min={dateArrivee || minDateArrivee}
+              <label className="text-xs text-gray-500 font-semibold block mb-1.5">Départ</label>
+              <input type="date" value={dateDepart} min={dateArrivee || today}
                 onChange={e => setDateDepart(e.target.value)}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400" />
             </div>
           </div>
-          {nuits > 0 && (
-            <p className="text-xs text-blue-600 font-medium -mt-3 bg-blue-50 px-3 py-1.5 rounded-lg w-fit">
-              {nuits} nuit{nuits > 1 ? 's' : ''} · nouveau total : {(prixChambre * nuits).toLocaleString()} FCFA
-            </p>
+          {nouvellesNuits > 0 && (
+            <p className="text-xs text-gray-400 -mt-3">{nouvellesNuits} nuit{nouvellesNuits > 1 ? 's' : ''} · Actuel : {reservation.nuits} nuit{reservation.nuits > 1 ? 's' : ''}</p>
           )}
 
-          {/* Voyageurs */}
+          {/* Sélection chambre */}
           <div>
-            <label className="text-xs text-gray-500 font-semibold block mb-1.5">Nombre de voyageurs</label>
-            <div className="flex items-center gap-3 border border-gray-200 rounded-xl px-4 py-2.5 w-fit">
-              <button onClick={() => setVoyageurs(v => Math.max(1, v - 1))}
-                className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold text-gray-600 text-base leading-none transition-colors">−</button>
-              <span className="text-sm font-semibold w-5 text-center">{voyageurs}</span>
-              <button onClick={() => setVoyageurs(v => Math.min(selectedChambre?.capacite || 4, v + 1))}
-                className="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center font-bold text-gray-600 text-base leading-none transition-colors">+</button>
-              {selectedChambre && (
-                <span className="text-xs text-gray-400 ml-1">max {selectedChambre.capacite} pers.</span>
-              )}
-            </div>
+            <label className="text-xs text-gray-500 font-semibold block mb-1.5">Chambre</label>
+            {loading ? (
+              <div className="w-full border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-2 text-sm text-gray-400">
+                <Loader2 size={14} className="animate-spin" /> Chargement...
+              </div>
+            ) : (
+              <select
+                value={selectedId}
+                onChange={e => setSelectedId(e.target.value === 'same' ? 'same' : parseInt(e.target.value))}
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:border-blue-400 bg-white"
+              >
+                <option value="same">Garder — {reservation.typeChambreNom} ({prixNuitActuel.toLocaleString()} FCFA/nuit)</option>
+                {chambres.filter(c => c.id !== reservation.typeChambreId).map(c => {
+                  const prixC = parseFloat(c.prix_nuit) * nouvellesNuits
+                  const tag = prixC < totalActuel ? '↓ Baisse' : prixC > totalActuel ? '↑ Hausse' : '= Identique'
+                  return (
+                    <option key={c.id} value={c.id}>
+                      {c.nom} — {parseFloat(c.prix_nuit).toLocaleString()} FCFA/nuit ({tag})
+                    </option>
+                  )
+                })}
+              </select>
+            )}
           </div>
 
-          {/* Récapitulatif financier */}
-          {nuits > 0 && newTotal !== oldTotal && (
-            <div className={`rounded-xl border p-4 ${isHausse ? 'bg-green-50 border-green-200' : 'bg-amber-50 border-amber-200'}`}>
-              <p className={`text-xs font-bold uppercase tracking-wide mb-3 ${isHausse ? 'text-green-700' : 'text-amber-700'}`}>
-                {isHausse ? 'Supplément à régler' : 'Remboursement estimé'}
-              </p>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between text-gray-600">
-                  <span>Montant actuel</span>
-                  <span>{oldTotal.toLocaleString()} FCFA</span>
+          {/* Règle 2h */}
+          {aChange && difference > 0 && !estHausse && (
+            <div className={`rounded-xl p-3 text-xs flex items-start gap-2 ${dansFenetre2h ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}>
+              <Info size={14} className="shrink-0 mt-0.5" />
+              {dansFenetre2h
+                ? 'Paiement effectué il y a moins de 2h — différence remboursée intégralement, sans frais.'
+                : `Après le délai de 2h : frais de modification de ${reservation.tauxModification}% sur la différence.`}
+            </div>
+          )}
+
+          {/* Récapitulatif financier — Baisse */}
+          {aChange && difference > 0 && !estHausse && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2 text-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-amber-700 mb-3">Remboursement estimé</p>
+              <div className="flex justify-between text-gray-600">
+                <span>Montant actuel</span><span>{totalActuel.toLocaleString()} FCFA</span>
+              </div>
+              <div className="flex justify-between text-gray-600">
+                <span>Nouveau montant ({nouvellesNuits} nuit{nouvellesNuits > 1 ? 's' : ''})</span>
+                <span>{nouveauTotal.toLocaleString()} FCFA</span>
+              </div>
+              <div className="flex justify-between text-gray-600 border-t border-amber-100 pt-2">
+                <span>Différence</span><span>{difference.toLocaleString()} FCFA</span>
+              </div>
+              {!dansFenetre2h && fraisModif > 0 && (
+                <div className="flex justify-between text-gray-500 text-xs">
+                  <span>Frais de modification ({reservation.tauxModification}%)</span>
+                  <span>−{fraisModif.toLocaleString()} FCFA</span>
                 </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Nouveau montant</span>
-                  <span>{newTotal.toLocaleString()} FCFA</span>
-                </div>
-                {isHausse && (
-                  <div className="flex justify-between border-t border-green-200 pt-2 font-bold text-green-800">
-                    <span>Supplément à payer</span>
-                    <span>+{diff.toLocaleString()} FCFA</span>
-                  </div>
-                )}
-                {isBaisse && (
-                  <>
-                    {!reservation.paiementRecent && (
-                      <>
-                        <div className="flex justify-between text-gray-500 text-xs pt-1">
-                          <span>Commission PHAROS ({reservation.commissionTaux}%) — acquise</span>
-                          <span>−{commissionDiff.toLocaleString()} FCFA</span>
-                        </div>
-                        <div className="flex justify-between text-gray-500 text-xs">
-                          <span>Pénalité hôtel ({reservation.tauxPenaliteHotel}%)</span>
-                          <span>−{penalite.toLocaleString()} FCFA</span>
-                        </div>
-                      </>
-                    )}
-                    <div className="flex justify-between border-t border-amber-200 pt-2 font-bold">
-                      <span className="text-gray-800">Vous serez remboursé</span>
-                      <span className="text-green-700">{remboursement.toLocaleString()} FCFA</span>
-                    </div>
-                  </>
-                )}
+              )}
+              <div className="flex justify-between border-t border-amber-200 pt-2 font-bold">
+                <span className="text-gray-800">Vous serez remboursé</span>
+                <span className="text-green-700">{remboursement.toLocaleString()} FCFA</span>
               </div>
             </div>
           )}
 
-          {/* Note info si aucun changement financier */}
-          {nuits > 0 && newTotal === oldTotal && somethingChanged && (
-            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700 flex items-center gap-2">
-              <Info size={14} className="shrink-0" />
-              Aucune différence de montant — modification sans frais ni remboursement.
+          {/* Récapitulatif financier — Hausse */}
+          {aChange && difference > 0 && estHausse && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2 text-sm">
+              <p className="text-xs font-bold uppercase tracking-wide text-blue-700 mb-3">Supplément à payer</p>
+              <div className="flex justify-between text-gray-600">
+                <span>Montant déjà payé</span><span>{totalActuel.toLocaleString()} FCFA</span>
+              </div>
+              <div className="flex justify-between text-gray-600">
+                <span>Nouveau montant ({nouvellesNuits} nuit{nouvellesNuits > 1 ? 's' : ''})</span>
+                <span>{nouveauTotal.toLocaleString()} FCFA</span>
+              </div>
+              <div className="flex justify-between border-t border-blue-200 pt-2 font-bold">
+                <span className="text-gray-800">Supplément (Mobile Money)</span>
+                <span className="text-blue-700">{supplement.toLocaleString()} FCFA</span>
+              </div>
             </div>
           )}
 
-          {/* Paiement Mobile Money si hausse */}
-          {isHausse && nuits > 0 && (
+          {/* Numéro Mobile Money */}
+          {aChange && (
             <div>
-              <label className="text-xs text-gray-500 font-semibold block mb-1.5">Numéro Mobile Money pour le supplément</label>
-              <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-3 focus-within:border-blue-400 transition-colors">
-                <Smartphone size={15} className="text-gray-400 shrink-0" />
-                <span className="text-gray-500 text-sm font-medium">+229</span>
-                <div className="w-px h-5 bg-gray-200" />
-                <input type="tel" value={telephone}
-                  onChange={e => setTelephone(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                  placeholder="XXXXXXXX"
-                  className="flex-1 text-sm text-gray-800 outline-none" />
+              <label className="text-xs text-gray-500 font-semibold block mb-1.5">
+                {estHausse && difference > 0 ? 'Numéro Mobile Money — prélèvement du supplément' : 'Numéro Mobile Money — remboursement'}
+                <span className="text-red-400 ml-1">*</span>
+              </label>
+              <div className="flex gap-2">
+                <select value={methode} onChange={e => setMethode(e.target.value)}
+                  className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400 bg-white">
+                  <option value="mtn">MTN</option>
+                  <option value="moov">Moov</option>
+                </select>
+                <input type="tel" value={telephone} onChange={e => setTelephone(e.target.value)}
+                  placeholder="+229 XX XX XX XX"
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400" />
               </div>
             </div>
           )}
 
-          {/* Boutons */}
+          {erreur && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-600 flex items-center gap-2">
+              <AlertCircle size={14} className="shrink-0" /> {erreur}
+            </div>
+          )}
+
           <div className="flex gap-3 pt-1">
             <button onClick={onFermer}
               className="flex-1 border border-gray-200 text-gray-700 font-semibold py-3 rounded-xl text-sm hover:bg-gray-50 transition-colors">
               Annuler
             </button>
             <button
-              disabled={!formValide}
-              onClick={() => {
-                onValider(
-                  isHausse ? 'hausse' : isBaisse ? 'baisse' : 'same',
-                  newTotal,
-                  isHausse ? diff : isBaisse ? remboursement : 0,
-                  { dateArrivee, dateDepart, nuits, voyageurs, chambre: selectedChambre || chambreActuelle }
-                )
-              }}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-3 rounded-xl text-sm transition-colors">
-              {isHausse && nuits > 0
-                ? `Payer ${diff.toLocaleString()} FCFA`
-                : isBaisse && nuits > 0
-                  ? `Confirmer — rembours. ${remboursement.toLocaleString()} FCFA`
-                  : 'Confirmer la modification'}
+              disabled={!aChange || envoi}
+              onClick={handleConfirmer}
+              className={`flex-1 ${estHausse && difference > 0 ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'} disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2`}>
+              {envoi && <Loader2 size={14} className="animate-spin" />}
+              {!aChange ? 'Aucune modification'
+                : estHausse && difference > 0 ? `Confirmer (+${supplement.toLocaleString()} FCFA)`
+                : difference > 0 ? `Confirmer (rembours. ${remboursement.toLocaleString()} FCFA)`
+                : 'Confirmer'}
             </button>
           </div>
         </div>
@@ -427,19 +285,44 @@ function ModalModification({ reservation, onFermer, onValider }) {
 }
 
 function ModalAnnulation({ reservation, onFermer, onConfirmer }) {
-  const now = new Date()
-  const arrivee = new Date(reservation.dateArrivee)
-  const heuresAvantArrivee = (arrivee - now) / 3600000
-  const peutAnnuler = heuresAvantArrivee > 24
+  const today = new Date().toISOString().split('T')[0]
+  const bloque = today >= reservation.dateArrivee
 
-  const commission = Math.round(reservation.total * reservation.commissionTaux / 100)
-  const escrow = reservation.total - commission
-  const penalite = reservation.paiementRecent ? 0 : Math.round(escrow * reservation.tauxPenaliteHotel / 100)
-  const remboursement = reservation.paiementRecent ? reservation.total : escrow - penalite
+  const datePaiement = reservation.datePaiement ? new Date(reservation.datePaiement) : null
+  const heuresDepuisPaiement = datePaiement ? (Date.now() - datePaiement.getTime()) / 3600000 : Infinity
+  const dansFenetre2h = heuresDepuisPaiement <= 2
 
+  const fraisEstime = dansFenetre2h ? 0 : Math.round(reservation.total * reservation.tauxAnnulation / 100)
+  const remboursementEstime = reservation.total - fraisEstime
+
+  const [motif, setMotif] = useState('')
+  const [envoi, setEnvoi] = useState(false)
+  const [erreur, setErreur] = useState('')
+  const [telephone, setTelephone] = useState('')
+  const [methode, setMethode] = useState('mtn')
   const formatDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 
-  if (!peutAnnuler) {
+  const handleConfirmer = async () => {
+    if (!motif.trim()) { setErreur('Veuillez indiquer un motif.'); return }
+    if (remboursementEstime > 0 && !telephone.trim()) { setErreur('Veuillez indiquer votre numéro Mobile Money pour recevoir le remboursement.'); return }
+    setEnvoi(true)
+    setErreur('')
+    try {
+      const res = await api.post(`/reservations/${reservation.id}/annuler/`, {
+        motif,
+        numero_telephone: telephone.trim(),
+        methode_paiement: methode,
+      })
+      const rembourse = parseFloat(res.data.montant_rembourse)
+      onConfirmer(reservation.id, rembourse)
+    } catch (err) {
+      setErreur(err.response?.data?.detail || 'Une erreur est survenue.')
+    } finally {
+      setEnvoi(false)
+    }
+  }
+
+  if (bloque) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
@@ -450,8 +333,10 @@ function ModalAnnulation({ reservation, onFermer, onConfirmer }) {
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
             <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-red-700 text-sm">Délai dépassé</p>
-              <p className="text-xs text-red-600 mt-1">L'annulation n'est plus possible à moins de 24h de la date d'arrivée ({formatDate(reservation.dateArrivee)}).</p>
+              <p className="font-semibold text-red-700 text-sm">Annulation bloquée</p>
+              <p className="text-xs text-red-600 mt-1">
+                Aucune annulation n'est possible le jour d'arrivée ou après ({formatDate(reservation.dateArrivee)}).
+              </p>
             </div>
           </div>
           <button onClick={onFermer} className="w-full mt-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-xl text-sm transition-colors">Fermer</button>
@@ -469,7 +354,7 @@ function ModalAnnulation({ reservation, onFermer, onConfirmer }) {
         </div>
 
         <div className="p-6 space-y-4">
-          {/* Résumé réservation */}
+          {/* Résumé */}
           <div className="bg-gray-50 rounded-xl p-4">
             <p className="text-sm font-semibold text-gray-900">{reservation.hotelNom}</p>
             <p className="text-xs text-gray-400 font-mono mt-0.5">{reservation.id}</p>
@@ -479,39 +364,70 @@ function ModalAnnulation({ reservation, onFermer, onConfirmer }) {
           </div>
 
           {/* Règle applicable */}
-          <div className={`rounded-xl p-3 text-xs flex items-start gap-2 ${reservation.paiementRecent ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}>
+          <div className={`rounded-xl p-3 text-xs flex items-start gap-2 ${dansFenetre2h ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-amber-50 border border-amber-200 text-amber-700'}`}>
             <Info size={14} className="shrink-0 mt-0.5" />
-            {reservation.paiementRecent
-              ? 'Paiement effectué il y a moins de 2h — vous serez remboursé intégralement.'
-              : `Annulation au-delà de 2h après paiement — le taux d'annulation de l'hôtel (${reservation.tauxPenaliteHotel}%) s'applique.`}
+            {dansFenetre2h
+              ? 'Paiement effectué il y a moins de 2h — remboursement intégral, aucun frais.'
+              : `Après les 2h — frais d'annulation de ${reservation.tauxAnnulation}% retenus par l'hôtel.`}
           </div>
 
           {/* Détail remboursement */}
           <div className="border border-gray-200 rounded-xl p-4 space-y-2 text-sm">
-            <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-3">Détail du remboursement</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-3">Remboursement estimé</p>
             <div className="flex justify-between text-gray-700">
               <span>Montant total payé</span>
               <span className="font-medium">{reservation.total.toLocaleString()} FCFA</span>
             </div>
-            {!reservation.paiementRecent && (
-              <>
-                <div className="flex justify-between text-gray-400 text-xs">
-                  <span>Commission PHAROS ({reservation.commissionTaux}%) — acquise</span>
-                  <span>−{commission.toLocaleString()} FCFA</span>
-                </div>
-                <div className="flex justify-between text-gray-400 text-xs">
-                  <span>Pénalité hôtel ({reservation.tauxPenaliteHotel}%)</span>
-                  <span>−{penalite.toLocaleString()} FCFA</span>
-                </div>
-              </>
+            {!dansFenetre2h && (
+              <div className="flex justify-between text-gray-400 text-xs">
+                <span>Frais d'annulation ({reservation.tauxAnnulation}%)</span>
+                <span>−{fraisEstime.toLocaleString()} FCFA</span>
+              </div>
             )}
             <div className="flex justify-between border-t border-gray-100 pt-3 font-bold">
               <span className="text-gray-900">Vous recevez</span>
-              <span className="text-green-600 text-base">{remboursement.toLocaleString()} FCFA</span>
+              <span className="text-green-600 text-base">{remboursementEstime.toLocaleString()} FCFA</span>
             </div>
           </div>
 
-          {/* Info délai */}
+          {/* Numéro Mobile Money pour remboursement */}
+          {remboursementEstime > 0 && (
+            <div>
+              <label className="text-xs text-gray-500 font-semibold block mb-1.5">
+                Numéro Mobile Money — remboursement <span className="text-red-400">*</span>
+              </label>
+              <div className="flex gap-2">
+                <select value={methode} onChange={e => setMethode(e.target.value)}
+                  className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400 bg-white">
+                  <option value="mtn">MTN</option>
+                  <option value="moov">Moov</option>
+                </select>
+                <input type="tel" value={telephone} onChange={e => setTelephone(e.target.value)}
+                  placeholder="+229 XX XX XX XX"
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400" />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Le remboursement de {remboursementEstime.toLocaleString()} FCFA sera versé sur ce numéro.</p>
+            </div>
+          )}
+
+          {/* Motif */}
+          <div>
+            <label className="text-xs text-gray-500 font-semibold block mb-1.5">Motif de l'annulation <span className="text-red-400">*</span></label>
+            <textarea
+              value={motif}
+              onChange={e => setMotif(e.target.value)}
+              rows={2}
+              placeholder="Précisez la raison de votre annulation..."
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400 resize-none"
+            />
+          </div>
+
+          {erreur && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-600 flex items-center gap-2">
+              <AlertCircle size={14} className="shrink-0" /> {erreur}
+            </div>
+          )}
+
           <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700 flex items-center gap-2">
             <Shield size={14} className="shrink-0" />
             Remboursement sur votre Mobile Money sous 24 à 72h ouvrées.
@@ -522,8 +438,11 @@ function ModalAnnulation({ reservation, onFermer, onConfirmer }) {
               className="flex-1 border border-gray-200 text-gray-700 font-semibold py-3 rounded-xl text-sm hover:bg-gray-50 transition-colors">
               Conserver
             </button>
-            <button onClick={() => onConfirmer(reservation.id, remboursement)}
-              className="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-xl text-sm transition-colors">
+            <button
+              onClick={handleConfirmer}
+              disabled={envoi || !motif.trim()}
+              className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
+              {envoi && <Loader2 size={14} className="animate-spin" />}
               Annuler la réservation
             </button>
           </div>
@@ -533,14 +452,63 @@ function ModalAnnulation({ reservation, onFermer, onConfirmer }) {
   )
 }
 
-function CarteReservation({ reservation, onConfirmerSejour, onModifier, onAnnuler }) {
+// Mots interdits détectés côté client avant soumission
+const MOTS_INTERDITS = [
+  // Français
+  'merde', 'putain', 'connard', 'connasse', 'salope', 'enculé', 'encule', 'fdp', 'nique',
+  'niquer', 'conne', 'con', 'pute', 'bâtard', 'batard', 'fils de pute', 'va te faire',
+  'ta gueule', 'ferme ta gueule', 'imbécile', 'idiot', 'crétin', 'abruti', 'ntm', 'pd',
+  // Fon / Yoruba (termes vulgaires courants)
+  'ashawo', 'werey', 'oloshi', 'ode', 'kpata', 'wo wo', 'wô wô', 'ayanfe', 'olo',
+]
+
+function contientMotInterdit(texte) {
+  if (!texte) return false
+  const t = texte.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+  return MOTS_INTERDITS.some(mot => {
+    const m = mot.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+    return t.includes(m)
+  })
+}
+
+function formatCountdown(sec) {
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  const s = sec % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+function CarteReservation({ reservation, onConfirmerSejour, onModifier, onAnnuler, onNotif }) {
   const [qrOuvert, setQrOuvert] = useState(false)
-  const [avisOuvert, setAvisOuvert] = useState(false)
-  const [note, setNote] = useState(reservation.noteClient || 0)
+  // Avis
+  const [localAvisDisponible, setLocalAvisDisponible] = useState(reservation.avisDisponible || false)
+  const [avisModalOuvert, setAvisModalOuvert] = useState(false)
+  const [note, setNote] = useState(0)
   const [commentaire, setCommentaire] = useState('')
-  const [avisEnvoye, setAvisEnvoye] = useState(!!reservation.noteClient)
+  const [explication, setExplication] = useState('')
+  const [etapeSignalement, setEtapeSignalement] = useState(false)
+  const [avisEnvoye, setAvisEnvoye] = useState(reservation.aSoumisAvis || false)
+  const [signalementEnvoye, setSignalementEnvoye] = useState(false)
   const [avisEnvoi, setAvisEnvoi] = useState(false)
   const [avisErreur, setAvisErreur] = useState('')
+  const [secondesRestantes, setSecondesRestantes] = useState(null)
+
+  // Countdown post-séjour
+  useEffect(() => {
+    if (reservation.statut !== 'terminee' || localAvisDisponible) return
+    const depart = new Date(reservation.dateDepart + 'T00:00:00')
+    const dureeSecondes = (reservation.nuits || 1) * 24 * 3600
+    const calculer = () => Math.max(0, Math.floor(dureeSecondes - (Date.now() - depart.getTime()) / 1000))
+    const initial = calculer()
+    setSecondesRestantes(initial)
+    if (initial === 0) { setLocalAvisDisponible(true); return }
+    const timer = setInterval(() => {
+      const restantes = calculer()
+      setSecondesRestantes(restantes)
+      if (restantes <= 0) { clearInterval(timer); setLocalAvisDisponible(true) }
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [reservation.id, localAvisDisponible])
 
   const now = new Date()
   const arrivee = new Date(reservation.dateArrivee)
@@ -599,11 +567,11 @@ function CarteReservation({ reservation, onConfirmerSejour, onModifier, onAnnule
           <p className="font-bold text-blue-600 text-sm">{reservation.total.toLocaleString()} FCFA</p>
         </div>
 
-        {/* Alerte 24h */}
+        {/* Alerte jour d'arrivée */}
         {peutAgir && dans24h && (
           <div className="mb-3 px-3 py-2 rounded-xl text-xs border bg-orange-50 text-orange-700 border-orange-100 flex items-center gap-1.5">
             <AlertCircle size={12} />
-            Modification et annulation impossibles dans les 24h précédant l'arrivée.
+            Modification et annulation bloquées le jour d'arrivée.
           </div>
         )}
 
@@ -671,16 +639,32 @@ function CarteReservation({ reservation, onConfirmerSejour, onModifier, onAnnule
             </button>
           ) : null}
 
-          {reservation.statut === 'terminee' && !avisEnvoye && (
-            <button onClick={() => setAvisOuvert(!avisOuvert)}
-              className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-colors">
-              <Star size={12} /> Laisser un avis
+          {/* Zone avis post-séjour */}
+          {reservation.statut === 'terminee' && !avisEnvoye && !localAvisDisponible && secondesRestantes !== null && (
+            <div className="w-full flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+              <Star size={12} className="text-gray-300 shrink-0" />
+              <span className="text-xs text-gray-400">Avis disponible dans</span>
+              <span className="font-mono text-xs font-bold text-blue-600 tracking-widest">
+                {formatCountdown(secondesRestantes)}
+              </span>
+            </div>
+          )}
+          {reservation.statut === 'terminee' && !avisEnvoye && localAvisDisponible && (
+            <button onClick={() => setAvisModalOuvert(true)}
+              className="flex items-center gap-1.5 bg-amber-400 hover:bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors shadow-sm">
+              <Star size={12} className="fill-white" /> Donner votre avis
             </button>
           )}
           {reservation.statut === 'terminee' && avisEnvoye && (
             <div className="flex items-center gap-1 text-xs text-amber-600">
-              {[...Array(note)].map((_, i) => <Star key={i} size={11} className="fill-amber-400 text-amber-400" />)}
-              <span className="ml-1 text-gray-400">Avis publié</span>
+              {[...Array(note || 1)].map((_, i) => <Star key={i} size={11} className="fill-amber-400 text-amber-400" />)}
+              <span className="ml-1 text-gray-400">Avis envoyé</span>
+            </div>
+          )}
+          {reservation.statut === 'terminee' && signalementEnvoye && (
+            <div className="flex items-center gap-1.5 text-xs text-orange-600 bg-orange-50 border border-orange-100 rounded-lg px-2 py-1.5">
+              <AlertCircle size={11} className="shrink-0" />
+              <span>Commentaire en cours de modération</span>
             </div>
           )}
         </div>
@@ -697,48 +681,99 @@ function CarteReservation({ reservation, onConfirmerSejour, onModifier, onAnnule
           </div>
         )}
 
-        {/* Formulaire avis */}
-        {avisOuvert && !avisEnvoye && (
-          <div className="mt-3 pt-3 border-t border-gray-50">
-            <p className="text-xs font-semibold text-gray-700 mb-2">Votre note pour {reservation.hotelNom}</p>
-            <div className="flex gap-1 mb-3">
-              {[1, 2, 3, 4, 5].map(n => (
-                <button key={n} onClick={() => setNote(n)}>
-                  <Star size={24} className={n <= note ? 'fill-amber-400 text-amber-400' : 'text-gray-200'} />
-                </button>
-              ))}
+        {/* Modale avis */}
+        {avisModalOuvert && !avisEnvoye && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-gray-900 text-base">
+                  {etapeSignalement ? 'Précisez votre commentaire' : `Votre avis — ${reservation.hotelNom}`}
+                </h3>
+                <button onClick={() => { setAvisModalOuvert(false); setEtapeSignalement(false); setAvisErreur('') }}
+                  className="text-gray-400 hover:text-gray-600 transition-colors">✕</button>
+              </div>
+
+              {!etapeSignalement ? (
+                <>
+                  {/* Sélection note */}
+                  <p className="text-xs text-gray-500 mb-2">Votre note globale</p>
+                  <div className="flex gap-2 mb-4 justify-center">
+                    {[1, 2, 3, 4, 5].map(n => (
+                      <button key={n} onClick={() => setNote(n)} className="transition-transform hover:scale-110">
+                        <Star size={32} className={n <= note ? 'fill-amber-400 text-amber-400' : 'text-gray-200'} />
+                      </button>
+                    ))}
+                  </div>
+                  <textarea value={commentaire} onChange={e => setCommentaire(e.target.value)} rows={4}
+                    placeholder="Partagez votre expérience (service, propreté, confort...)..."
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-amber-400 resize-none mb-3" />
+                  {avisErreur && <p className="text-red-500 text-xs mb-2">{avisErreur}</p>}
+                  <button
+                    onClick={async () => {
+                      if (note === 0) { setAvisErreur('Veuillez choisir une note.'); return }
+                      if (contientMotInterdit(commentaire)) {
+                        setEtapeSignalement(true)
+                        setAvisErreur('')
+                        return
+                      }
+                      setAvisEnvoi(true); setAvisErreur('')
+                      try {
+                        await api.post('/avis/', {
+                          hotel: reservation.hotelId,
+                          reservation: reservation.reservationPk,
+                          note,
+                          commentaire,
+                        })
+                        setAvisEnvoye(true); setAvisModalOuvert(false)
+                      } catch (err) {
+                        const data = err.response?.data
+                        const msg = data?.non_field_errors?.[0] || data?.detail || Object.values(data || {})[0] || 'Erreur lors de la publication.'
+                        setAvisErreur(typeof msg === 'string' ? msg : JSON.stringify(msg))
+                      } finally { setAvisEnvoi(false) }
+                    }}
+                    disabled={note === 0 || avisEnvoi}
+                    className="w-full bg-amber-400 hover:bg-amber-500 disabled:bg-gray-100 disabled:text-gray-400 text-white font-bold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
+                    {avisEnvoi ? <Loader2 size={14} className="animate-spin" /> : <Star size={14} className="fill-white" />}
+                    {avisEnvoi ? 'Publication...' : 'Publier mon avis'}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="bg-orange-50 border border-orange-100 rounded-xl p-3 mb-4 text-xs text-orange-700">
+                    Votre commentaire contient des termes inappropriés. Merci de nous expliquer ce qui s'est passé pour que nous puissions traiter votre retour.
+                  </div>
+                  <p className="text-xs text-gray-500 mb-1">Votre explication</p>
+                  <textarea value={explication} onChange={e => setExplication(e.target.value)} rows={4}
+                    placeholder="Décrivez la situation qui vous a conduit à utiliser ces termes..."
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-orange-400 resize-none mb-3" />
+                  {avisErreur && <p className="text-red-500 text-xs mb-2">{avisErreur}</p>}
+                  <button
+                    onClick={async () => {
+                      if (!explication.trim()) { setAvisErreur('Veuillez fournir une explication.'); return }
+                      setAvisEnvoi(true); setAvisErreur('')
+                      try {
+                        await api.post('/signalements/', {
+                          reservation: reservation.reservationPk,
+                          hotel: reservation.hotelId,
+                          avis_initial: commentaire,
+                          explication,
+                        })
+                        setSignalementEnvoye(true); setAvisModalOuvert(false)
+                        onNotif?.('Votre commentaire a été transmis pour modération. Merci !')
+                      } catch (err) {
+                        const data = err.response?.data
+                        const msg = data?.non_field_errors?.[0] || data?.detail || Object.values(data || {})[0] || 'Erreur lors de l\'envoi.'
+                        setAvisErreur(typeof msg === 'string' ? msg : JSON.stringify(msg))
+                      } finally { setAvisEnvoi(false) }
+                    }}
+                    disabled={!explication.trim() || avisEnvoi}
+                    className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-100 disabled:text-gray-400 text-white font-bold py-2.5 rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
+                    {avisEnvoi ? <Loader2 size={14} className="animate-spin" /> : null}
+                    {avisEnvoi ? 'Envoi...' : 'Envoyer mon explication'}
+                  </button>
+                </>
+              )}
             </div>
-            <textarea value={commentaire} onChange={e => setCommentaire(e.target.value)} rows={2}
-              placeholder="Partagez votre expérience (optionnel)..."
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-xs outline-none focus:border-blue-400 resize-none" />
-            {avisErreur && <p className="text-red-500 text-xs mt-1">{avisErreur}</p>}
-            <button
-              onClick={async () => {
-                if (note === 0) return
-                setAvisEnvoi(true)
-                setAvisErreur('')
-                try {
-                  await api.post('/avis/', {
-                    hotel: reservation.hotelId,
-                    reservation: reservation.reservationPk,
-                    note,
-                    commentaire,
-                  })
-                  setAvisEnvoye(true)
-                  setAvisOuvert(false)
-                } catch (err) {
-                  const data = err.response?.data
-                  const msg = data?.non_field_errors?.[0] || data?.detail || Object.values(data || {})[0] || 'Erreur lors de la publication.'
-                  setAvisErreur(typeof msg === 'string' ? msg : JSON.stringify(msg))
-                } finally {
-                  setAvisEnvoi(false)
-                }
-              }}
-              disabled={note === 0 || avisEnvoi}
-              className="mt-2 w-full bg-amber-400 hover:bg-amber-500 disabled:bg-gray-100 disabled:text-gray-400 text-white font-semibold py-2 rounded-lg text-xs transition-colors flex items-center justify-center gap-1">
-              {avisEnvoi ? <Loader2 size={12} className="animate-spin" /> : null}
-              {avisEnvoi ? 'Publication...' : 'Publier l\'avis'}
-            </button>
           </div>
         )}
       </div>
@@ -757,7 +792,7 @@ export default function EspaceClient() {
   const [notif, setNotif] = useState(null)
 
   // Charger les vraies réservations depuis le backend
-  useEffect(() => {
+  usePolling(() => {
     api.get('/client/reservations/')
       .then(res => {
         const data = res.data.map(r => ({
@@ -771,20 +806,22 @@ export default function EspaceClient() {
           dateDepart: r.date_depart,
           nuits: r.nb_nuits,
           voyageurs: r.nb_adultes ?? 1,
+          typeChambreId: r.type_chambre_id,
+          typeChambreNom: r.type_chambre_nom,
           chambres: [{ type: r.type_chambre_nom, quantite: 1, prix: parseFloat(r.prix_total) / (r.nb_nuits || 1) }],
           total: parseFloat(r.prix_total),
           statut: r.statut,
-          methode: 'Mobile Money',
-          commissionTaux: 3,
-          tauxPenaliteHotel: 20,
-          paiementRecent: false,
-          chambresDisponibles: [],
+          tauxAnnulation: r.hotel_taux_annulation ?? 20,
+          tauxModification: r.hotel_taux_modification ?? 10,
+          datePaiement: r.date_paiement || null,
+          avisDisponible: r.avis_disponible || false,
+          aSoumisAvis: r.a_soumis_avis || false,
         }))
         setReservations(data)
       })
       .catch(() => setReservations([]))
       .finally(() => setChargementRes(false))
-  }, [])
+  }, 30000)
 
   const afficherNotif = (msg, type = 'succes') => {
     setNotif({ msg, type })
@@ -805,26 +842,24 @@ export default function EspaceClient() {
     }
   }
 
-  const validerModification = (type, nouveauTotal, montant, details) => {
+  const validerModification = (apiData, nouvelleChambres) => {
     setReservations(prev => prev.map(r => {
       if (r.id !== modalModif.id) return r
       return {
         ...r,
-        total: nouveauTotal,
-        dateArrivee: details.dateArrivee,
-        dateDepart: details.dateDepart,
-        nuits: details.nuits,
-        voyageurs: details.voyageurs,
-        chambres: [{ type: details.chambre.type, quantite: 1, prix: details.chambre.prix }],
+        total: parseFloat(apiData.prix_nouveau),
+        typeChambreNom: nouvelleChambres.nom,
+        typeChambreId: nouvelleChambres.id,
+        chambres: [{ type: nouvelleChambres.nom, quantite: 1, prix: parseFloat(nouvelleChambres.prix_nuit) }],
       }
     }))
-    afficherNotif(
-      type === 'hausse'
-        ? `Modification confirmée. Supplément de ${montant.toLocaleString()} FCFA débité.`
-        : type === 'baisse'
-          ? `Modification confirmée. Remboursement de ${montant.toLocaleString()} FCFA sous 24-72h.`
-          : 'Modification de votre réservation enregistrée.'
-    )
+    const montant = parseFloat(apiData.montant_rembourse || 0)
+    const supplement = parseFloat(apiData.montant_supplementaire || 0)
+    if (apiData.sens === 'hausse') {
+      afficherNotif(`Modification confirmée. Supplément de ${Math.round(supplement).toLocaleString()} FCFA à régler à l'hôtel à l'arrivée.`)
+    } else {
+      afficherNotif(`Modification confirmée. Remboursement de ${Math.round(montant).toLocaleString()} FCFA sous 24-72h.`)
+    }
     setModalModif(null)
   }
 
@@ -832,7 +867,7 @@ export default function EspaceClient() {
     setReservations(prev => prev.map(r =>
       r.id === id ? { ...r, statut: 'annulee' } : r
     ))
-    afficherNotif(`Réservation annulée. Remboursement de ${remboursement.toLocaleString()} FCFA sous 24-72h.`)
+    afficherNotif(`Réservation annulée. Remboursement de ${Math.round(remboursement).toLocaleString()} FCFA sous 24-72h.`)
     setModalAnnul(null)
   }
 
@@ -855,8 +890,8 @@ export default function EspaceClient() {
 
         {/* Notification */}
         {notif && (
-          <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-5 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 max-w-sm animate-in">
-            <CheckCircle size={16} /> {notif.msg}
+          <div className={`fixed top-4 right-4 z-50 ${notif.type === 'erreur' ? 'bg-red-500' : 'bg-green-600'} text-white px-5 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 max-w-sm`}>
+            {notif.type === 'erreur' ? <AlertCircle size={16} /> : <CheckCircle size={16} />} {notif.msg}
           </div>
         )}
 
@@ -956,6 +991,7 @@ export default function EspaceClient() {
                     onConfirmerSejour={confirmerSejour}
                     onModifier={setModalModif}
                     onAnnuler={setModalAnnul}
+                    onNotif={afficherNotif}
                   />
                 ))}
               </div>

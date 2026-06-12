@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { Star, MessageSquare, CheckCircle, Send, Loader } from 'lucide-react'
 import SidebarHotelier from '../../components/common/SidebarHotelier'
 import api from '../../services/api'
+import usePolling from '../../hooks/usePolling'
 
 function EtoilesMoyenne({ note }) {
   return (
@@ -22,12 +23,12 @@ export default function GestionAvis() {
   const [texteReponse, setTexteReponse] = useState('')
   const [enEnvoi, setEnEnvoi] = useState(false)
 
-  useEffect(() => {
+  usePolling(() => {
     api.get('/gestionnaire/avis/')
       .then(res => setAvis(res.data))
       .catch(err => console.error('Erreur chargement avis', err))
       .finally(() => setChargement(false))
-  }, [])
+  }, 30000)
 
   const avisFiltres = avis
     .filter(a => filtreNote === 0 || a.note === filtreNote)

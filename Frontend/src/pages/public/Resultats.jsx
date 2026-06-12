@@ -35,12 +35,14 @@ export default function Resultats() {
       .then(res => {
         let data = res.data.map(h => ({
           ...h,
-          prix_min: h.types_chambres?.[0]?.prix_nuit ? parseFloat(h.types_chambres[0].prix_nuit) : null,
+          prix_min: h.prix_min,
+          prix_min_original: h.prix_min_original,
+          a_promotion: h.a_promotion || false,
           note_moyenne: parseFloat(h.note_moyenne) || 0,
           nb_avis: h.nombre_avis || 0,
           abonnement: h.type_abonnement,
           localisation: h.quartier || h.adresse || '',
-          equipements: [],
+          equipements: h.equipements || [],
         }))
         if (tri === 'prix_asc') data.sort((a, b) => (a.prix_min || 0) - (b.prix_min || 0))
         else if (tri === 'prix_desc') data.sort((a, b) => (b.prix_min || 0) - (a.prix_min || 0))
@@ -52,6 +54,17 @@ export default function Resultats() {
   }
 
   useEffect(() => { chargerHotels() }, [ville, tri])
+
+  const hotelsFiltres = hotels.filter(h => {
+    if (filtres.type && h.type_etablissement !== filtres.type) return false
+    if (filtres.etoilesMin > 0 && (h.note_moyenne || 0) < filtres.etoilesMin) return false
+    if (filtres.equipements.length > 0) {
+      const eq = (h.equipements || []).map(e => String(e).toLowerCase())
+      if (!filtres.equipements.every(f => eq.includes(f))) return false
+    }
+    if (filtres.restauration && h.abonnement !== 'pro') return false
+    return true
+  })
 
   const toggleEquipement = (eq) => {
     setFiltres(prev => ({
@@ -66,7 +79,7 @@ export default function Resultats() {
 
   const reinitialiserFiltres = () => setFiltres({ equipements: [], type: '', etoilesMin: 0, restauration: false })
 
-  const PanneauFiltres = () => (
+  const panneauFiltres = (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-gray-900">Filtres</h3>
@@ -175,7 +188,7 @@ export default function Resultats() {
           {/* Filtres sidebar desktop */}
           <aside className="hidden lg:block w-64 shrink-0">
             <div className="bg-white rounded-2xl border border-gray-100 p-5 sticky top-36">
-              <PanneauFiltres />
+              {panneauFiltres}
             </div>
           </aside>
 
@@ -185,7 +198,7 @@ export default function Resultats() {
             <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
               <div>
                 <p className="text-gray-800 font-semibold">
-                  <span className="text-blue-600">{hotels.length}</span> hébergement{hotels.length > 1 ? 's' : ''} trouvé{hotels.length > 1 ? 's' : ''}
+                  <span className="text-blue-600">{hotelsFiltres.length}</span> hébergement{hotelsFiltres.length > 1 ? 's' : ''} trouvé{hotelsFiltres.length > 1 ? 's' : ''}
                   {ville && <span className="text-gray-500 font-normal"> à {ville}</span>}
                 </p>
                 {dateArrivee && dateDepart && (
@@ -223,7 +236,7 @@ export default function Resultats() {
             {/* Filtres mobile */}
             {filtresOuverts && (
               <div className="lg:hidden bg-white rounded-2xl border border-gray-100 p-5 mb-5">
-                <PanneauFiltres />
+                {panneauFiltres}
               </div>
             )}
 
@@ -232,7 +245,7 @@ export default function Resultats() {
                 <Loader2 size={40} className="text-blue-500 mx-auto mb-3 animate-spin" />
                 <p className="text-gray-500">Recherche en cours...</p>
               </div>
-            ) : hotels.length === 0 ? (
+            ) : hotelsFiltres.length === 0 ? (
               <div className="bg-white rounded-2xl p-12 text-center border border-gray-100">
                 <Search size={48} className="text-gray-300 mx-auto mb-4" />
                 <h3 className="font-bold text-gray-900 text-lg mb-2">Aucun hébergement trouvé</h3>
@@ -247,7 +260,7 @@ export default function Resultats() {
                 ? 'grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5'
                 : 'space-y-4'
               }>
-                {hotels.map(hotel => (
+                {hotelsFiltres.map(hotel => (
                   <CarteHotel key={hotel.id} hotel={hotel} vue={vueGrille ? 'grille' : 'liste'} />
                 ))}
               </div>

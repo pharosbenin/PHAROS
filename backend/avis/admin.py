@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Avis, SignalementAvis
+from .models import Avis, SignalementAvis, SignalementContenu, SignalementHotel
 
 
 @admin.register(Avis)
@@ -18,6 +18,31 @@ class AvisAdmin(admin.ModelAdmin):
     def retirer_approbation(self, request, queryset):
         queryset.update(est_approuve=False)
     retirer_approbation.short_description = 'Retirer l\'approbation'
+
+
+@admin.register(SignalementContenu)
+class SignalementContenuAdmin(admin.ModelAdmin):
+    list_display = ('hotel', 'client', 'statut', 'date_signalement')
+    list_filter = ('statut',)
+    search_fields = ('hotel__nom', 'client__username', 'avis_initial')
+    readonly_fields = ('reservation', 'client', 'hotel', 'avis_initial', 'explication', 'date_signalement')
+    actions = ['marquer_traite']
+
+    def marquer_traite(self, request, queryset):
+        queryset.update(statut='traite')
+    marquer_traite.short_description = 'Marquer comme traité'
+
+
+@admin.register(SignalementHotel)
+class SignalementHotelAdmin(admin.ModelAdmin):
+    list_display = ('hotel', 'client', 'motif', 'statut', 'date_signalement')
+    list_filter = ('statut', 'motif')
+    readonly_fields = ('client', 'hotel', 'motif', 'description', 'date_signalement')
+    actions = ['marquer_traite']
+
+    def marquer_traite(self, request, queryset):
+        queryset.update(statut='traite')
+    marquer_traite.short_description = 'Marquer comme traité'
 
 
 @admin.register(SignalementAvis)

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Hotel, Users, Percent,
-  CalendarDays, ShieldAlert, LogOut
+  CalendarDays, ShieldAlert, LogOut, MessageSquare,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
@@ -11,11 +11,15 @@ export default function SidebarAdmin() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [demandesCount, setDemandesCount] = useState(0)
+  const [messagesNonLus, setMessagesNonLus] = useState(0)
 
   useEffect(() => {
     api.get('/admin/demandes-upgrade/?statut=en_attente')
       .then(res => setDemandesCount((res.data || []).length))
       .catch(() => setDemandesCount(0))
+    api.get('/admin/contacts/')
+      .then(res => setMessagesNonLus(res.data?.non_lus ?? 0))
+      .catch(() => setMessagesNonLus(0))
   }, [])
 
   const navItems = [
@@ -25,6 +29,7 @@ export default function SidebarAdmin() {
     { to: '/admin/commissions', icon: Percent, label: 'Commissions', badge: demandesCount },
     { to: '/admin/evenements', icon: CalendarDays, label: 'Événements' },
     { to: '/admin/moderation', icon: ShieldAlert, label: 'Modération' },
+    { to: '/admin/messages', icon: MessageSquare, label: 'Messages', badge: messagesNonLus },
   ]
 
   return (

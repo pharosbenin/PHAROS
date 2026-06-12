@@ -103,6 +103,10 @@ CORS_ALLOW_CREDENTIALS = True
 
 AUTH_USER_MODEL = 'accounts.CustomUser'
 
+# Africa's Talking SMS — remplacer par vos vraies clés en production
+AT_USERNAME = 'sandbox'       # Remplacer par votre username AT en production
+AT_API_KEY = ''               # Remplacer par votre clé API AT (laisser vide = mode dev console)
+
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
