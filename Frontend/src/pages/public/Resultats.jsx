@@ -6,9 +6,30 @@ import CarteHotel from '../../components/common/CarteHotel'
 import api from '../../services/api'
 
 const VILLES_BENIN = [
-  'Cotonou', 'Porto-Novo', 'Parakou', 'Abomey-Calavi', 'Djougou',
-  'Bohicon', 'Kandi', 'Lokossa', 'Ouidah', 'Natitingou',
-  'Dassa-Zoumè', 'Abomey', 'Nikki', 'Malanville'
+  // Littoral
+  'Cotonou',
+  // Ouémé
+  'Porto-Novo', 'Adjohoun', 'Akpro-Missérété', 'Avrankou', 'Bonou', 'Dangbo', 'Missérété', 'Sèmè-Kpodji',
+  // Atlantique
+  'Abomey-Calavi', 'Allada', 'Ouidah', 'Kpomassè', 'Sô-Ava', 'Toffo', 'Tori-Bossito', 'Zè',
+  // Borgou
+  'Parakou', 'Bembèrèkè', 'Kalalé', "N'Dali", 'Nikki', 'Pèrèrè', 'Sinendé', 'Tchaourou',
+  // Zou
+  'Abomey', 'Bohicon', 'Agbangnizoun', 'Covè', 'Djidja', 'Ouinhi', 'Zagnanado', 'Za-Kpota', 'Zogbodomè',
+  // Collines
+  'Dassa-Zoumè', 'Glazoué', 'Bantè', 'Ouèssè', 'Savalou', 'Savè',
+  // Atacora
+  'Natitingou', 'Boukoumbé', 'Cobly', 'Copargo', 'Kérou', 'Kouandé', 'Matéri', 'Péhunco', 'Tanguiéta', 'Toukountouna',
+  // Alibori
+  'Malanville', 'Banikoara', 'Gogounou', 'Kandi', 'Karimama', 'Ségbana',
+  // Donga
+  'Djougou', 'Bassila', 'Ouaké',
+  // Mono
+  'Lokossa', 'Athiémé', 'Bopa', 'Comè', 'Grand-Popo', 'Houéyogbé',
+  // Couffo
+  'Aplahoué', 'Djakotomey', 'Dogbo', 'Klouékanmè', 'Lalo', 'Toviklin',
+  // Plateau
+  'Kétou', 'Pobè', 'Sakété', 'Adja-Ouèrè', 'Ifangni',
 ]
 
 export default function Resultats() {
@@ -22,7 +43,7 @@ export default function Resultats() {
   const [tri, setTri] = useState('popularite')
   const [vueGrille, setVueGrille] = useState(true)
   const [filtresOuverts, setFiltresOuverts] = useState(false)
-  const [filtres, setFiltres] = useState({ equipements: [], type: '', etoilesMin: 0, restauration: false })
+  const [filtres, setFiltres] = useState({ equipements: [], type: '', etoilesMin: 0, restauration: false, prixMax: 0, nbPersonnes: 0 })
   const [hotels, setHotels] = useState([])
   const [chargement, setChargement] = useState(true)
 
@@ -63,6 +84,8 @@ export default function Resultats() {
       if (!filtres.equipements.every(f => eq.includes(f))) return false
     }
     if (filtres.restauration && h.abonnement !== 'pro') return false
+    if (filtres.prixMax > 0 && (h.prix_min || 0) > filtres.prixMax) return false
+    if (filtres.nbPersonnes > 0 && (h.capacite_max || 0) < filtres.nbPersonnes) return false
     return true
   })
 
@@ -75,9 +98,9 @@ export default function Resultats() {
     }))
   }
 
-  const nbFiltresActifs = filtres.equipements.length + (filtres.type ? 1 : 0) + (filtres.etoilesMin > 0 ? 1 : 0) + (filtres.restauration ? 1 : 0)
+  const nbFiltresActifs = filtres.equipements.length + (filtres.type ? 1 : 0) + (filtres.etoilesMin > 0 ? 1 : 0) + (filtres.restauration ? 1 : 0) + (filtres.prixMax > 0 ? 1 : 0) + (filtres.nbPersonnes > 0 ? 1 : 0)
 
-  const reinitialiserFiltres = () => setFiltres({ equipements: [], type: '', etoilesMin: 0, restauration: false })
+  const reinitialiserFiltres = () => setFiltres({ equipements: [], type: '', etoilesMin: 0, restauration: false, prixMax: 0, nbPersonnes: 0 })
 
   const panneauFiltres = (
     <div className="space-y-6">
@@ -130,7 +153,54 @@ export default function Resultats() {
         ))}
       </div>
 
-      {/* Prix */}
+      {/* Prix max */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-semibold text-gray-700">Prix max / nuit</p>
+          {filtres.prixMax > 0 && (
+            <span className="text-xs font-bold text-orange-500">{filtres.prixMax.toLocaleString()} FCFA</span>
+          )}
+        </div>
+        <input
+          type="range"
+          min={0} max={500000} step={5000}
+          value={filtres.prixMax || 500000}
+          onChange={e => setFiltres(prev => ({ ...prev, prixMax: parseInt(e.target.value) === 500000 ? 0 : parseInt(e.target.value) }))}
+          className="w-full accent-orange-500 cursor-pointer"
+        />
+        <div className="flex justify-between text-xs text-gray-400 mt-1">
+          <span>0</span>
+          <span className={filtres.prixMax === 0 ? 'text-gray-400' : 'text-orange-500 font-medium'}>
+            {filtres.prixMax === 0 ? 'Pas de limite' : `≤ ${filtres.prixMax.toLocaleString()} FCFA`}
+          </span>
+          <span>500 000</span>
+        </div>
+      </div>
+
+      {/* Nombre de personnes */}
+      <div>
+        <p className="text-sm font-semibold text-gray-700 mb-2">Capacité (personnes)</p>
+        <div className="flex flex-wrap gap-2">
+          {[0, 1, 2, 3, 4, 5, 6].map(n => (
+            <button
+              key={n}
+              onClick={() => setFiltres(prev => ({ ...prev, nbPersonnes: prev.nbPersonnes === n ? 0 : n }))}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                filtres.nbPersonnes === n && n > 0
+                  ? 'bg-orange-500 text-white border-orange-500'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'
+              }`}
+            >
+              {n === 0 ? 'Tous' : n === 6 ? '6+' : n}
+            </button>
+          ))}
+        </div>
+        {filtres.nbPersonnes > 0 && (
+          <p className="text-xs text-gray-400 mt-1.5">Chambres pour ≥ {filtres.nbPersonnes} personne{filtres.nbPersonnes > 1 ? 's' : ''}</p>
+        )}
+      </div>
+
+      {/* Partenaires certifiés */}
       <div>
         <p className="text-sm font-semibold text-gray-700 mb-2">Abonnement</p>
         <label className="flex items-center gap-2 py-1.5 cursor-pointer">
@@ -159,7 +229,7 @@ export default function Resultats() {
               </select>
             </div>
             <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-2.5 sm:w-40">
-              <input type="date" value={dateArrivee} onChange={e => setDateArrivee(e.target.value)}
+              <input type="date" value={dateArrivee} onChange={e => { setDateArrivee(e.target.value); if (dateDepart && e.target.value >= dateDepart) setDateDepart('') }}
                 className="bg-transparent text-sm text-gray-700 outline-none w-full" placeholder="Arrivée" />
             </div>
             <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-2.5 sm:w-40">

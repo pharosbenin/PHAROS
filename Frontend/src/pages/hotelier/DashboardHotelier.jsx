@@ -139,15 +139,21 @@ export default function DashboardHotelier() {
         {/* En-tête */}
         <div className="flex items-start justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Tableau de bord</h1>
-            <p className="text-gray-400 text-sm mt-0.5">
-              {hotel?.type_abonnement === 'pro'
-                ? '🏆 Abonnement PRO actif'
-                : 'Abonnement FREEMIUM · '}
-              {hotel?.type_abonnement !== 'pro' && (
-                <span className="text-blue-600 cursor-pointer hover:underline text-xs">Passer en PRO</span>
+            <h1 className="text-2xl font-black text-gray-900">Tableau de bord</h1>
+            <div className="flex items-center gap-2 mt-1">
+              {hotel?.type_abonnement === 'pro' ? (
+                <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full border border-amber-200">
+                  PRO
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-500 text-xs font-semibold px-2.5 py-1 rounded-full">
+                  FREEMIUM
+                </span>
               )}
-            </p>
+              {hotel?.type_abonnement !== 'pro' && (
+                <span className="text-blue-600 cursor-pointer hover:underline text-xs font-medium">Passer en PRO</span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <button className="relative p-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50">
@@ -170,12 +176,15 @@ export default function DashboardHotelier() {
         {/* KPIs */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {stats.map((s, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-gray-100 p-5">
-              <div className={`w-10 h-10 ${s.bg} rounded-xl flex items-center justify-center mb-3`}>
-                <s.icon size={20} className={s.couleur} />
+            <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+              <div className={`h-1 w-full ${['bg-green-500', 'bg-blue-500', 'bg-indigo-500', 'bg-amber-400'][i]}`} />
+              <div className="p-5">
+                <div className={`w-10 h-10 ${s.bg} rounded-xl flex items-center justify-center mb-3`}>
+                  <s.icon size={20} className={s.couleur} />
+                </div>
+                <p className="text-xl font-black text-gray-900">{s.valeur}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
               </div>
-              <p className="text-xl font-black text-gray-900">{s.valeur}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>

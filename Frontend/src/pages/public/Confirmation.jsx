@@ -1,11 +1,13 @@
 import { useParams, useLocation, Link } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
-import { CheckCircle, Download, QrCode, MapPin, Phone, Calendar, Users, Home } from 'lucide-react'
+import { CheckCircle, Download, QrCode, MapPin, Phone, Calendar, Users, Home, UserPlus } from 'lucide-react'
 import Layout from '../../components/common/Layout'
+import { useAuth } from '../../context/AuthContext'
 
 export default function Confirmation() {
   const { reservationId } = useParams()
   const { state } = useLocation()
+  const { user } = useAuth()
 
   // Nouveau format : { reservation (objet backend), methodeLabel }
   const res = state?.reservation
@@ -25,7 +27,7 @@ export default function Confirmation() {
   const voyageurs = res?.nb_adultes || state?.voyageurs || 1
   const total = parseFloat(res?.prix_total || state?.total || 0)
   const chambreNom = res?.type_chambre_nom || state?.panier?.[0]?.type || 'Chambre'
-  const qrCodeValue = res?.qrcode?.code || numReservation
+  const qrCodeValue = String(numReservation)
 
   const dateReservation = new Date().toLocaleDateString('fr-FR', {
     day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
@@ -53,12 +55,6 @@ export default function Confirmation() {
               Un email de confirmation a été envoyé à <span className="text-blue-600 font-medium">{emailClient}</span>
             </p>
           )}
-          <div className="inline-flex items-center gap-2 mt-3 bg-gray-100 rounded-full px-4 py-1.5">
-            <span className="text-xs text-gray-500">Numéro de réservation</span>
-            <span className="text-sm font-bold text-gray-900 tracking-wide font-mono">
-              {String(numReservation).slice(0, 8).toUpperCase()}
-            </span>
-          </div>
         </div>
 
         {/* QR Code */}
@@ -73,8 +69,8 @@ export default function Confirmation() {
             </div>
           </div>
           <p className="text-xs text-gray-400">
-            Présentez ce QR code à la réception de l'hôtel lors de votre arrivée.<br />
-            Code : <strong className="font-mono">{String(qrCodeValue).slice(0, 8).toUpperCase()}</strong>
+            Scannez ce QR code pour afficher votre numéro de réservation.<br />
+            Présentez-le aussi à la réception lors de votre arrivée.
           </p>
         </div>
 
@@ -156,6 +152,37 @@ export default function Confirmation() {
           </p>
         </div>
 
+        {/* Proposition de compte — uniquement pour les réservations invité */}
+        {!user && (
+          <div className="bg-white border border-blue-100 rounded-2xl p-5 mb-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center shrink-0">
+                <UserPlus size={18} className="text-blue-600" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-900 text-sm">Créez un compte pour suivre cette réservation</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Modifiez, annulez ou consultez l'historique de vos séjours depuis votre espace personnel.
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/inscription"
+              state={{ email: emailClient, prenom: prenomClient, nom: nomClient }}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+            >
+              Créer mon compte
+            </Link>
+            <p className="text-center text-xs text-gray-400 mt-3">
+              Sans créer de compte, vous pourrez quand même{' '}
+              <Link to="/suivi-reservation" state={{ numero: String(numReservation), email: emailClient }} className="text-blue-600 hover:underline">
+                gérer cette réservation
+              </Link>{' '}
+              avec votre numéro et votre email.
+            </p>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3">
           <button
@@ -165,12 +192,14 @@ export default function Confirmation() {
             <Download size={18} />
             Télécharger le justificatif
           </button>
-          <Link
-            to="/client/espace"
-            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors text-sm"
-          >
-            Voir mes réservations
-          </Link>
+          {user && (
+            <Link
+              to="/client/espace"
+              className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition-colors text-sm"
+            >
+              Voir mes réservations
+            </Link>
+          )}
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">

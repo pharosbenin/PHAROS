@@ -32,6 +32,11 @@ def connexion(request):
             {'detail': "Aucun compte actif n'a été trouvé avec les identifiants fournis"},
             status=status.HTTP_401_UNAUTHORIZED
         )
+    if user.est_suspendu:
+        return Response(
+            {'detail': "Votre compte a été suspendu. Contactez le support PHAROS pour plus d'informations."},
+            status=status.HTTP_403_FORBIDDEN
+        )
     refresh = RefreshToken.for_user(user)
     return Response({
         'refresh': str(refresh),
@@ -46,6 +51,15 @@ def inscription(request):
     serializer = InscriptionSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
+
+        # Rattacher automatiquement les réservations effectuées en tant qu'invité
+        # avec ce même email avant la création du compte.
+        if user.role == 'client':
+            from reservations.models import Reservation
+            Reservation.objects.filter(
+                email_client__iexact=user.email, client__isnull=True
+            ).update(client=user)
+
         refresh = RefreshToken.for_user(user)
         return Response({
             'message': 'Compte créé avec succès.',
@@ -82,6 +96,17 @@ def changer_mot_de_passe(request):
         user.save()
         return Response({'message': 'Mot de passe modifié avec succès.'})
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def supprimer_compte(request):
+    mot_de_passe = request.data.get('mot_de_passe', '')
+    user = request.user
+    if not user.check_password(mot_de_passe):
+        return Response({'mot_de_passe': 'Mot de passe incorrect.'}, status=status.HTTP_400_BAD_REQUEST)
+    user.delete()
+    return Response({'message': 'Compte supprimé avec succès.'})
 
 
 # --- OTP ---

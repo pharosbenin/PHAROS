@@ -63,11 +63,13 @@ def _finaliser_sejour(reservation):
 
 
 def _recompute_disponibilite(type_chambre):
-    """Met à jour est_disponible selon les réservations actives (non terminées, non annulées)."""
+    """Met à jour est_disponible : True si au moins une unité est libre AUJOURD'HUI."""
     today = timezone.now().date()
+    # Réservations qui chevauchent avec aujourd'hui (client est présent ou arrive aujourd'hui)
     active = Reservation.objects.filter(
         type_chambre=type_chambre,
         statut__in=['payee', 'confirmee', 'en_cours', 'confirme_client', 'confirme_hotel'],
+        date_arrivee__lte=today,
         date_depart__gt=today,
     ).count()
     new_val = active < type_chambre.nombre_chambres
@@ -76,16 +78,19 @@ def _recompute_disponibilite(type_chambre):
         type_chambre.save(update_fields=['est_disponible'])
 
 
-# --- Création de réservation (clients connectés uniquement) ---
+# --- Création de réservation (clients connectés ou invités) ---
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, EstNonSuspendu])
+@permission_classes([AllowAny])
 def creer_reservation(request):
-    if request.user.role in ('gestionnaire', 'admin'):
-        return Response(
-            {'detail': 'Les gestionnaires et administrateurs ne peuvent pas effectuer de réservations.'},
-            status=status.HTTP_403_FORBIDDEN
-        )
+    if request.user.is_authenticated:
+        if request.user.role in ('gestionnaire', 'admin'):
+            return Response(
+                {'detail': 'Les gestionnaires et administrateurs ne peuvent pas effectuer de réservations.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        if request.user.est_suspendu:
+            return Response({'detail': 'Votre compte a été suspendu.'}, status=status.HTTP_403_FORBIDDEN)
     serializer = ReservationCreerSerializer(data=request.data, context={'request': request})
     if serializer.is_valid():
         reservation = serializer.save()
@@ -100,10 +105,10 @@ def detail_reservation(request, numero):
         reservation = Reservation.objects.get(numero=numero)
     except Reservation.DoesNotExist:
         return Response({'detail': 'Réservation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
-    # Accès : client connecté ou email correspondant
-    if request.user.is_authenticated:
-        if reservation.client != request.user and request.user.role not in ('admin', 'gestionnaire'):
-            return Response({'detail': 'Accès non autorisé.'}, status=status.HTTP_403_FORBIDDEN)
+    # Accès : client connecté propriétaire, staff, ou email invité correspondant
+    est_staff = request.user.is_authenticated and request.user.role in ('admin', 'gestionnaire')
+    if not est_staff and not _proprietaire_autorise(reservation, request):
+        return Response({'detail': 'Accès non autorisé.'}, status=status.HTTP_403_FORBIDDEN)
     return Response(ReservationDetailSerializer(reservation).data)
 
 
@@ -195,6 +200,17 @@ def qrcode_reservation(request, numero):
     return Response(QRCodeSerializer(qr).data)
 
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def recu_par_qrcode(request, code):
+    """Retourne le reçu complet d'une réservation à partir du code QR (accès public pour scan)."""
+    try:
+        qr = QRCodeReservation.objects.select_related('reservation').get(code=code)
+    except QRCodeReservation.DoesNotExist:
+        return Response({'detail': 'QR Code invalide ou introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+    return Response(ReservationDetailSerializer(qr.reservation).data)
+
+
 @api_view(['POST'])
 @permission_classes([IsAuthenticated, EstGestionnaire, EstHotelValide])
 def scanner_qrcode(request):
@@ -227,16 +243,32 @@ def _verifier_fenetre_confirmation(reservation):
     return timezone.now() >= depart_dt - timedelta(hours=5)
 
 
+def _proprietaire_autorise(reservation, request):
+    """Autorise le client authentifié propriétaire, ou — pour une réservation invité
+    (sans compte) — quiconque fournit l'email exact utilisé lors de la réservation.
+    Un utilisateur authentifié dont l'email correspond à email_client est aussi autorisé."""
+    if not request.user.is_authenticated:
+        email = (request.data.get('email_client') or request.query_params.get('email_client') or '').strip().lower()
+        return bool(email) and email == reservation.email_client.lower()
+    if reservation.client is not None:
+        return reservation.client == request.user
+    # Réservation invité : l'utilisateur connecté est reconnu par son email
+    return request.user.email.lower() == reservation.email_client.lower()
+
+
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, EstNonSuspendu])
+@permission_classes([AllowAny])
 def confirmer_sejour_client(request, numero):
-    """Le client confirme que son séjour s'est bien passé."""
+    """Le client (ou l'invité via son email) confirme que son séjour s'est bien passé."""
     try:
         reservation = Reservation.objects.get(numero=numero)
     except Reservation.DoesNotExist:
         return Response({'detail': 'Réservation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
 
-    if reservation.client != request.user:
+    if request.user.is_authenticated and request.user.est_suspendu:
+        return Response({'detail': 'Votre compte a été suspendu.'}, status=status.HTTP_403_FORBIDDEN)
+
+    if not _proprietaire_autorise(reservation, request):
         return Response({'detail': 'Non autorisé.'}, status=status.HTTP_403_FORBIDDEN)
 
     if reservation.statut not in ('payee', 'confirmee', 'en_cours', 'confirme_hotel'):
@@ -295,14 +327,18 @@ def _taux_commission(hotel):
 # --- Annulation ---
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, EstNonSuspendu])
+@permission_classes([AllowAny])
 def demander_annulation(request, numero):
     try:
         reservation = Reservation.objects.get(numero=numero)
     except Reservation.DoesNotExist:
         return Response({'detail': 'Réservation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
 
-    if reservation.client != request.user and request.user.role not in ('admin', 'gestionnaire'):
+    if request.user.is_authenticated and request.user.est_suspendu:
+        return Response({'detail': 'Votre compte a été suspendu.'}, status=status.HTTP_403_FORBIDDEN)
+
+    est_staff = request.user.is_authenticated and request.user.role in ('admin', 'gestionnaire')
+    if not est_staff and not _proprietaire_autorise(reservation, request):
         return Response({'detail': 'Non autorisé.'}, status=status.HTTP_403_FORBIDDEN)
 
     if reservation.statut in ('terminee', 'annulee', 'remboursee'):
@@ -404,14 +440,17 @@ def demander_annulation(request, numero):
 # --- Modification à la baisse ---
 
 @api_view(['POST'])
-@permission_classes([IsAuthenticated, EstNonSuspendu])
+@permission_classes([AllowAny])
 def demander_modification(request, numero):
     try:
         reservation = Reservation.objects.get(numero=numero)
     except Reservation.DoesNotExist:
         return Response({'detail': 'Réservation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
 
-    if reservation.client != request.user:
+    if request.user.is_authenticated and request.user.est_suspendu:
+        return Response({'detail': 'Votre compte a été suspendu.'}, status=status.HTTP_403_FORBIDDEN)
+
+    if not _proprietaire_autorise(reservation, request):
         return Response({'detail': 'Non autorisé.'}, status=status.HTTP_403_FORBIDDEN)
 
     if reservation.statut in ('terminee', 'annulee', 'remboursee'):
@@ -436,6 +475,19 @@ def demander_modification(request, numero):
     if nouvelle_chambre.hotel != reservation.hotel:
         return Response(
             {'detail': "Cette chambre n'appartient pas au même hôtel."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # Vérification disponibilité sur les nouvelles dates (overlap exact, couvre chambre identique ou différente)
+    reservations_overlapping = Reservation.objects.filter(
+        type_chambre=nouvelle_chambre,
+        statut__in=['payee', 'confirmee', 'en_cours', 'confirme_client', 'confirme_hotel'],
+        date_arrivee__lt=date_depart_nouvelle,
+        date_depart__gte=date_arrivee_nouvelle,
+    ).exclude(numero=reservation.numero).count()
+    if reservations_overlapping >= nouvelle_chambre.nombre_chambres:
+        return Response(
+            {'detail': "Cette chambre n'est plus disponible pour les dates choisies."},
             status=status.HTTP_400_BAD_REQUEST
         )
 
@@ -479,7 +531,7 @@ def demander_modification(request, numero):
             commission_plateforme = round(frais_modification * _taux_commission(hotel), 2)
 
     ancienne_chambre = reservation.type_chambre
-    sens = 'hausse' if est_hausse else 'baisse'
+    sens = 'hausse' if est_hausse else ('neutre' if difference == 0 else 'baisse')
 
     modification = Modification.objects.create(
         reservation=reservation,
@@ -519,7 +571,9 @@ def demander_modification(request, numero):
             pass
 
     from accounts.models import Notification
-    if est_hausse:
+    if sens == 'neutre':
+        msg_fin = 'Aucun impact financier — changement de dates uniquement.'
+    elif est_hausse:
         msg_fin = f'Supplément à payer par le client : {montant_supplementaire} XOF.'
     else:
         msg_fin = (
@@ -552,8 +606,10 @@ class MesReservations(generics.ListAPIView):
     def get_queryset(self):
         from django.db.models import Q
         user = self.request.user
+        # Réservations du compte + réservations invité non encore rattachées au même email
+        # (jamais une réservation déjà rattachée à un AUTRE compte).
         return Reservation.objects.filter(
-            Q(client=user) | Q(email_client=user.email)
+            Q(client=user) | Q(client__isnull=True, email_client__iexact=user.email)
         ).distinct()
 
 

@@ -7,8 +7,152 @@ import {
   AlertCircle, Percent, Clock, Info, Camera, Globe
 } from 'lucide-react'
 import Layout from '../../components/common/Layout'
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
+
+// Fix icônes Leaflet avec Vite
+delete L.Icon.Default.prototype._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+})
 
 const STORAGE_KEY = 'pharos_inscription_hotelier'
+
+const VILLES_COORDS = {
+  'Cotonou': [6.3654, 2.4183],
+  'Porto-Novo': [6.4969, 2.6289],
+  'Adjohoun': [6.6833, 2.6167],
+  'Akpro-Missérété': [6.5667, 2.6167],
+  'Avrankou': [6.5667, 2.6667],
+  'Bonou': [6.9000, 2.4667],
+  'Dangbo': [6.6167, 2.5667],
+  'Missérété': [6.5333, 2.5833],
+  'Sèmè-Kpodji': [6.3667, 2.6000],
+  'Abomey-Calavi': [6.4487, 2.3544],
+  'Allada': [6.6667, 2.1500],
+  'Ouidah': [6.3601, 2.0800],
+  'Kpomassè': [6.5000, 1.9833],
+  'Sô-Ava': [6.4833, 2.4167],
+  'Toffo': [6.8500, 2.0833],
+  'Tori-Bossito': [6.5667, 2.1500],
+  'Zè': [6.7167, 2.2333],
+  'Parakou': [9.3372, 2.6276],
+  'Bembèrèkè': [10.2246, 2.6641],
+  'Kalalé': [10.2979, 3.3736],
+  "N'Dali": [9.8625, 2.7130],
+  'Nikki': [9.9380, 3.2103],
+  'Pèrèrè': [10.4167, 3.0500],
+  'Sinendé': [10.0167, 2.3833],
+  'Tchaourou': [8.8780, 2.5960],
+  'Abomey': [7.1828, 1.9936],
+  'Bohicon': [7.1750, 2.0644],
+  'Agbangnizoun': [7.1667, 1.9333],
+  'Covè': [7.2833, 2.3833],
+  'Djidja': [7.3500, 1.9667],
+  'Ouinhi': [7.0000, 2.4667],
+  'Zagnanado': [7.2500, 2.3333],
+  'Za-Kpota': [7.0667, 2.2167],
+  'Zogbodomè': [7.0667, 2.0500],
+  'Dassa-Zoumè': [7.7497, 2.1758],
+  'Glazoué': [7.9833, 2.2167],
+  'Bantè': [8.4167, 1.8833],
+  'Ouèssè': [8.5667, 2.5167],
+  'Savalou': [7.9338, 1.9758],
+  'Savè': [8.0333, 2.4833],
+  'Natitingou': [10.3038, 1.3822],
+  'Boukoumbé': [10.1833, 1.1000],
+  'Cobly': [10.4833, 1.0000],
+  'Copargo': [9.8333, 1.5500],
+  'Kérou': [10.8167, 2.1000],
+  'Kouandé': [10.3333, 1.6833],
+  'Matéri': [10.7167, 1.0500],
+  'Péhunco': [10.5500, 1.5167],
+  'Tanguiéta': [10.6167, 1.2667],
+  'Toukountouna': [10.4667, 1.3333],
+  'Malanville': [11.8672, 3.3893],
+  'Banikoara': [11.3000, 2.4333],
+  'Gogounou': [10.8333, 2.8333],
+  'Kandi': [11.1332, 2.9370],
+  'Karimama': [12.0667, 3.1833],
+  'Ségbana': [10.9333, 3.7000],
+  'Djougou': [9.7085, 1.6671],
+  'Bassila': [9.0000, 1.6667],
+  'Ouaké': [9.7167, 1.3833],
+  'Lokossa': [6.6363, 1.7185],
+  'Athiémé': [6.5833, 1.6833],
+  'Bopa': [6.7667, 1.7833],
+  'Comè': [6.4000, 1.8833],
+  'Grand-Popo': [6.2833, 1.8167],
+  'Houéyogbé': [6.6833, 1.7333],
+  'Aplahoué': [6.9341, 1.6844],
+  'Djakotomey': [6.8833, 1.6833],
+  'Dogbo': [6.8000, 1.7833],
+  'Klouékanmè': [6.9667, 1.7333],
+  'Lalo': [6.9167, 1.8833],
+  'Toviklin': [7.0000, 1.7833],
+  'Kétou': [7.3583, 2.5984],
+  'Pobè': [6.9833, 2.6667],
+  'Sakété': [6.7333, 2.6500],
+  'Adja-Ouèrè': [7.0167, 2.4667],
+  'Ifangni': [6.6500, 2.7167],
+}
+
+// Centre par défaut = Bénin
+const BENIN_CENTER = [9.3077, 2.3158]
+
+function CentreurVille({ ville }) {
+  const map = useMap()
+  useEffect(() => {
+    if (ville && VILLES_COORDS[ville]) {
+      map.setView(VILLES_COORDS[ville], 14, { animate: true })
+    }
+  }, [ville, map])
+  return null
+}
+
+function CliqueurCarte({ onClic }) {
+  useMapEvents({ click: e => onClic(e.latlng.lat, e.latlng.lng) })
+  return null
+}
+
+function CarteLocalisation({ ville, latitude, longitude, onChange }) {
+  const position = latitude && longitude ? [parseFloat(latitude), parseFloat(longitude)] : null
+  return (
+    <div>
+      <label className="text-xs text-gray-500 font-medium block mb-1.5 flex items-center gap-1">
+        <MapPin size={12} /> Emplacement sur la carte
+        <span className="text-gray-400 font-normal">(facultatif)</span>
+      </label>
+      <div className="rounded-xl overflow-hidden border border-gray-200" style={{ height: 260 }}>
+        <MapContainer
+          center={ville && VILLES_COORDS[ville] ? VILLES_COORDS[ville] : BENIN_CENTER}
+          zoom={ville ? 13 : 7}
+          style={{ height: '100%', width: '100%' }}
+          scrollWheelZoom={false}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+          <CentreurVille ville={ville} />
+          <CliqueurCarte onClic={(lat, lng) => onChange(lat.toFixed(6), lng.toFixed(6))} />
+          {position && <Marker position={position} />}
+        </MapContainer>
+      </div>
+      {position
+        ? <p className="text-xs text-green-600 mt-1.5 flex items-center gap-1">
+            <CheckCircle size={11} /> Marqueur posé · {parseFloat(latitude).toFixed(4)}, {parseFloat(longitude).toFixed(4)}
+          </p>
+        : <p className="text-xs text-gray-400 mt-1.5 flex items-center gap-1">
+            <Info size={11} /> Sélectionnez d'abord une ville, puis cliquez sur l'emplacement exact de votre hôtel
+          </p>
+      }
+    </div>
+  )
+}
 
 const VILLES_BENIN = [
   // Littoral
@@ -74,6 +218,7 @@ export default function InscriptionHotelier() {
   const [otpErreur, setOtpErreur] = useState('')
   const [otpLoading, setOtpLoading] = useState(false)
   const [otpTimer, setOtpTimer] = useState(0)
+  const [otpEnvoi, setOtpEnvoi] = useState(false)
   const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()]
 
   const [compte, setCompte] = useState(COMPTE_VIDE)
@@ -120,11 +265,10 @@ export default function InscriptionHotelier() {
       const tel = `+229${compte.telephone}`
       const { data } = await api.post('/auth/otp/envoyer/', { telephone: tel })
       setOtpTimer(300)
+      setOtpDigits(['', '', '', '', '', ''])
       if (data.dev_code) {
-        // Mode simulation : auto-remplissage du code
-        setOtpDigits(data.dev_code.split(''))
+        setTimeout(() => setOtpDigits(data.dev_code.split('')), 3000)
       } else {
-        setOtpDigits(['', '', '', '', '', ''])
         setTimeout(() => otpRefs[0].current?.focus(), 100)
       }
     } catch (err) {
@@ -187,6 +331,10 @@ export default function InscriptionHotelier() {
         setErreur('Veuillez remplir tous les champs obligatoires.')
         return false
       }
+      if (compte.telephone.length !== 10 || !compte.telephone.startsWith('01')) {
+        setErreur('Le numéro de téléphone doit contenir 10 chiffres et commencer par 01.')
+        return false
+      }
       if (compte.password.length < 8) {
         setErreur('Le mot de passe doit contenir au moins 8 caractères.')
         return false
@@ -220,7 +368,6 @@ export default function InscriptionHotelier() {
   const suivant = async () => {
     if (!validerEtape()) return
     if (etape === 1) {
-      // Déclencher vérification OTP avant de passer à l'étape 2
       setShowOtpModal(true)
       envoyerOtp()
       return
@@ -477,14 +624,14 @@ export default function InscriptionHotelier() {
                   <label className="text-xs text-gray-500 font-medium block mb-1.5">Prénom *</label>
                   <div className="relative">
                     <User size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input type="text" value={compte.prenom} onChange={e => setC('prenom', e.target.value)}
+                    <input type="text" value={compte.prenom} onChange={e => setC('prenom', e.target.value.replace(/[^a-zA-ZÀ-ÿ\s\-']/g, ''))}
                       placeholder="Jean"
                       className="w-full border border-gray-200 rounded-xl pl-9 pr-3 py-3 text-sm outline-none focus:border-blue-400 transition-colors" />
                   </div>
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 font-medium block mb-1.5">Nom *</label>
-                  <input type="text" value={compte.nom} onChange={e => setC('nom', e.target.value)}
+                  <input type="text" value={compte.nom} onChange={e => setC('nom', e.target.value.replace(/[^a-zA-ZÀ-ÿ\s\-']/g, ''))}
                     placeholder="Dupont"
                     className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 transition-colors" />
                 </div>
@@ -507,8 +654,8 @@ export default function InscriptionHotelier() {
                   <span className="text-sm text-gray-500 font-medium">+229</span>
                   <div className="w-px h-4 bg-gray-200" />
                   <input type="tel" value={compte.telephone}
-                    onChange={e => setC('telephone', e.target.value.replace(/\D/g, '').slice(0, 8))}
-                    placeholder="XXXXXXXX" className="flex-1 text-sm text-gray-800 outline-none" />
+                    onChange={e => setC('telephone', e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="01XXXXXXXX" className="flex-1 text-sm text-gray-800 outline-none" />
                 </div>
               </div>
 
@@ -605,24 +752,12 @@ export default function InscriptionHotelier() {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-gray-500 font-medium block mb-1.5">Latitude GPS</label>
-                  <input type="number" step="any" value={etab.latitude} onChange={e => setE('latitude', e.target.value)}
-                    placeholder="Ex : 6.3654"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 transition-colors" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500 font-medium block mb-1.5">Longitude GPS</label>
-                  <input type="number" step="any" value={etab.longitude} onChange={e => setE('longitude', e.target.value)}
-                    placeholder="Ex : 2.4183"
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-blue-400 transition-colors" />
-                </div>
-              </div>
-              <p className="text-xs text-gray-400 -mt-2 flex items-center gap-1">
-                <Info size={11} />
-                Sur maps.google.com → clic droit sur votre adresse → "Copier les coordonnées"
-              </p>
+              <CarteLocalisation
+                ville={etab.ville}
+                latitude={etab.latitude}
+                longitude={etab.longitude}
+                onChange={(lat, lng) => { setE('latitude', lat); setE('longitude', lng) }}
+              />
 
               <div>
                 <label className="text-xs text-gray-500 font-medium block mb-1.5">

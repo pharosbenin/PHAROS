@@ -1,4 +1,4 @@
-from django.db.models import Q, Exists, OuterRef
+from django.db.models import Q, Exists, OuterRef, Count, Subquery, IntegerField, F
 from django.utils import timezone
 from rest_framework import status, generics
 from rest_framework.decorators import api_view, permission_classes
@@ -68,6 +68,11 @@ def detail_hotel(request, pk):
         hotel = Hotel.objects.get(pk=pk, statut='valide')
     except Hotel.DoesNotExist:
         return Response({'detail': 'Hôtel introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+    # Rafraîchir est_disponible pour chaque chambre : couvre les dates dépassées
+    # et les annulations récentes sans attendre une action explicite.
+    from reservations.views import _recompute_disponibilite
+    for chambre in hotel.types_chambres.all():
+        _recompute_disponibilite(chambre)
     return Response(HotelDetailSerializer(hotel).data)
 
 
@@ -78,7 +83,36 @@ def chambres_hotel(request, pk):
         hotel = Hotel.objects.get(pk=pk, statut='valide')
     except Hotel.DoesNotExist:
         return Response({'detail': 'Hôtel introuvable.'}, status=status.HTTP_404_NOT_FOUND)
-    chambres = TypeChambre.objects.filter(hotel=hotel, est_disponible=True)
+
+    date_arrivee = request.query_params.get('date_arrivee')
+    date_depart = request.query_params.get('date_depart')
+
+    if date_arrivee and date_depart:
+        # Filtre par chevauchement réel sur les dates demandées
+        from datetime import date as date_type
+        from reservations.models import Reservation
+        from django.db.models import Count, OuterRef, Subquery, IntegerField
+        try:
+            d_arrivee = date_type.fromisoformat(date_arrivee)
+            d_depart = date_type.fromisoformat(date_depart)
+        except ValueError:
+            return Response({'detail': 'Dates invalides.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        nb_reservations = Reservation.objects.filter(
+            type_chambre=OuterRef('pk'),
+            statut__in=['payee', 'confirmee', 'en_cours', 'confirme_client', 'confirme_hotel'],
+            date_arrivee__lt=d_depart,
+            date_depart__gte=d_arrivee,
+        ).values('type_chambre').annotate(n=Count('id')).values('n')
+
+        chambres = TypeChambre.objects.filter(hotel=hotel).annotate(
+            nb_overlap=Subquery(nb_reservations, output_field=IntegerField())
+        ).filter(
+            Q(nb_overlap__isnull=True) | Q(nb_overlap__lt=F('nombre_chambres'))
+        )
+    else:
+        chambres = TypeChambre.objects.filter(hotel=hotel, est_disponible=True)
+
     return Response(TypeChambreSerializer(chambres, many=True).data)
 
 

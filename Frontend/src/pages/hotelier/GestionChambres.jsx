@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Edit3, Trash2, X, Save, BedDouble, Users, Wifi, Wind, Tv, CheckCircle, AlertCircle, Loader, Lock, Droplets, Sun, Upload } from 'lucide-react'
+import { Plus, Edit3, Trash2, X, Save, BedDouble, Users, Wifi, Wind, Tv, CheckCircle, AlertCircle, Loader, Lock, Droplets, Sun, Upload, GlassWater, Snowflake, Shirt, Sparkles, Monitor, Bath, ShowerHead, Coffee, Utensils, Car, Waves, Dumbbell, Phone, Music, Accessibility } from 'lucide-react'
 import toast from 'react-hot-toast'
 import SidebarHotelier from '../../components/common/SidebarHotelier'
 import { useHotelActif } from '../../context/HotelActifContext'
@@ -12,12 +12,33 @@ const resolverUrl = url => {
 }
 
 const EQUIPEMENTS_CHAMBRE = [
+  // Confort & Chambre
   { id: 'wifi', label: 'WiFi', icon: Wifi },
   { id: 'clim', label: 'Climatisation', icon: Wind },
   { id: 'tv', label: 'Télévision', icon: Tv },
-  { id: 'sdb_privee', label: 'Salle de bain privée', icon: Droplets },
-  { id: 'balcon', label: 'Balcon', icon: Sun },
   { id: 'coffre', label: 'Coffre-fort', icon: Lock },
+  { id: 'minibar', label: 'Minibar', icon: GlassWater },
+  { id: 'frigo', label: 'Réfrigérateur', icon: Snowflake },
+  { id: 'fer', label: 'Fer à repasser', icon: Shirt },
+  { id: 'seche_cheveux', label: 'Sèche-cheveux', icon: Sparkles },
+  { id: 'bureau', label: 'Bureau de travail', icon: Monitor },
+  // Salle de bain
+  { id: 'sdb_privee', label: 'Salle de bain privée', icon: Droplets },
+  { id: 'jacuzzi', label: 'Jacuzzi / Baignoire', icon: Bath },
+  { id: 'douche', label: 'Douche séparée', icon: ShowerHead },
+  // Restauration
+  { id: 'petit_dej', label: 'Petit-déjeuner inclus', icon: Coffee },
+  { id: 'kitchenette', label: 'Kitchenette', icon: Utensils },
+  // Services & Loisirs
+  { id: 'balcon', label: 'Balcon / Terrasse', icon: Sun },
+  { id: 'parking', label: 'Parking privé', icon: Car },
+  { id: 'piscine', label: 'Piscine', icon: Waves },
+  { id: 'sport', label: 'Salle de sport', icon: Dumbbell },
+  // Connectivité
+  { id: 'telephone', label: 'Téléphone chambre', icon: Phone },
+  { id: 'audio', label: 'Système audio', icon: Music },
+  // Accessibilité
+  { id: 'pmr', label: 'Accès PMR', icon: Accessibility },
 ]
 
 const CHAMBRE_VIDE = { nom: '', description: '', prix_nuit: '', capacite: 2, nombre_chambres: 1, equipements: [], est_disponible: true }
@@ -300,15 +321,22 @@ export default function GestionChambres() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-500 font-medium block mb-2">Équipements inclus</label>
-                  <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs text-gray-500 font-medium block mb-2">
+                    Équipements inclus
+                    {form.equipements.length > 0 && (
+                      <span className="ml-2 bg-blue-100 text-blue-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
+                        {form.equipements.length} sélectionné{form.equipements.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </label>
+                  <div className="grid grid-cols-3 gap-1.5">
                     {EQUIPEMENTS_CHAMBRE.map(eq => {
                       const actif = form.equipements.includes(eq.id)
                       return (
                         <button key={eq.id} type="button" onClick={() => toggleEquip(eq.id)}
-                          className={`flex items-center gap-2 p-2.5 rounded-xl border text-left text-xs font-medium transition-all ${actif ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                          <eq.icon size={14} className={actif ? 'text-blue-500' : 'text-gray-400'} />
-                          {eq.label}
+                          className={`flex items-center gap-1.5 px-2 py-2 rounded-lg border text-left text-xs font-medium transition-all ${actif ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                          <eq.icon size={13} className={`shrink-0 ${actif ? 'text-blue-500' : 'text-gray-400'}`} />
+                          <span className="truncate">{eq.label}</span>
                         </button>
                       )
                     })}

@@ -10,6 +10,16 @@ import Layout from '../../components/common/Layout'
 import api from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
 
+const LABELS_EQ_CHAMBRE = {
+  wifi: 'WiFi', clim: 'Climatisation', tv: 'Télévision', coffre: 'Coffre-fort',
+  minibar: 'Minibar', frigo: 'Réfrigérateur', fer: 'Fer à repasser',
+  seche_cheveux: 'Sèche-cheveux', bureau: 'Bureau de travail',
+  sdb_privee: 'Salle de bain privée', jacuzzi: 'Jacuzzi / Baignoire', douche: 'Douche séparée',
+  petit_dej: 'Petit-déjeuner inclus', kitchenette: 'Kitchenette',
+  balcon: 'Balcon / Terrasse', parking: 'Parking privé', piscine: 'Piscine',
+  sport: 'Salle de sport', telephone: 'Téléphone chambre', audio: 'Système audio', pmr: 'Accès PMR',
+}
+
 const ICONES_EQ = {
   wifi: { icon: <Wifi size={16} />, label: 'WiFi Gratuit' },
   parking: { icon: <Car size={16} />, label: 'Parking' },
@@ -113,8 +123,11 @@ function normaliserHotel(h) {
   }))
   const equipements = [...new Set(chambres.flatMap(c => c.equipements || []))]
   const photosSet = new Set()
-  if (h.photo_principale) photosSet.add(mediaUrl(h.photo_principale))
-  ;(h.photos || []).forEach(p => { if (p.image) photosSet.add(mediaUrl(p.image)) })
+  if (h.photos && h.photos.length > 0) {
+    h.photos.forEach(p => { if (p.image) photosSet.add(mediaUrl(p.image)) })
+  } else if (h.photo_principale) {
+    photosSet.add(mediaUrl(h.photo_principale))
+  }
   const _photos = [...photosSet].filter(Boolean)
   return {
     ...h,
@@ -160,6 +173,9 @@ export default function DetailEtablissement() {
   const [signalDescription, setSignalDescription] = useState('')
   const [signalEnvoi, setSignalEnvoi] = useState(false)
   const [signalOk, setSignalOk] = useState(false)
+  // IDs des chambres disponibles pour les dates sélectionnées (null = pas encore filtré)
+  const [chambresDispoIds, setChambresDispoIds] = useState(null)
+  const [chambreDetail, setChambreDetail] = useState(null)
 
   useEffect(() => {
     async function charger() {
@@ -181,6 +197,17 @@ export default function DetailEtablissement() {
     }
     charger()
   }, [id])
+
+  // Re-vérifie la disponibilité par chevauchement de dates dès que les deux dates sont saisies
+  useEffect(() => {
+    if (!dateArrivee || !dateDepart || !id) {
+      setChambresDispoIds(null)
+      return
+    }
+    api.get(`/hotels/${id}/chambres/?date_arrivee=${dateArrivee}&date_depart=${dateDepart}`)
+      .then(res => setChambresDispoIds(new Set(res.data.map(c => c.id))))
+      .catch(() => setChambresDispoIds(null))
+  }, [dateArrivee, dateDepart, id])
 
   if (chargement) {
     return (
@@ -214,10 +241,6 @@ export default function DetailEtablissement() {
     : 0
 
   const handleReserver = (chambre) => {
-    if (!user) {
-      navigate('/connexion', { state: { redirect: `/reservation/${id}?chambreId=${chambre.id}&hotelId=${id}&arrivee=${dateArrivee}&depart=${dateDepart}&nuits=${nuits}` } })
-      return
-    }
     if (!dateArrivee || !dateDepart) {
       setErreurDates(true)
       window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
@@ -226,6 +249,9 @@ export default function DetailEtablissement() {
     setErreurDates(false)
     navigate(`/reservation/${id}?chambreId=${chambre.id}&hotelId=${id}&arrivee=${dateArrivee}&depart=${dateDepart}&nuits=${nuits}`)
   }
+
+  // Disponibilité effective : filtrée par dates si l'utilisateur a sélectionné des dates, sinon état général (aujourd'hui)
+  const isDispo = (chambre) => chambresDispoIds !== null ? chambresDispoIds.has(chambre.id) : true
 
   const ouvrirGalerie = (index) => { setGalerieIndex(index); setGalerieOuverte(true) }
 
@@ -388,8 +414,10 @@ export default function DetailEtablissement() {
                     <Info size={15} className="shrink-0" /> Sélectionnez vos dates (à droite) pour voir les prix exacts et réserver.
                   </div>
                 )}
-                {hotel.chambres.map(chambre => (
-                  <div key={chambre.id} className={`bg-white rounded-2xl border overflow-hidden ${!chambre.dispo ? 'opacity-60 border-gray-100' : 'border-gray-200 hover:border-blue-200 hover:shadow-md transition-all'}`}>
+                {hotel.chambres.map(chambre => {
+                  const dispo = isDispo(chambre)
+                  return (
+                  <div key={chambre.id} className={`bg-white rounded-2xl border overflow-hidden ${!dispo ? 'opacity-60 border-gray-100' : 'border-gray-200 hover:border-blue-200 hover:shadow-md transition-all'}`}>
                     <div className="flex flex-col sm:flex-row">
                       {chambre.photo && (
                         <div className="sm:w-48 h-40 sm:h-auto shrink-0 overflow-hidden">
@@ -401,22 +429,30 @@ export default function DetailEtablissement() {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <h3 className="font-bold text-gray-900 text-base">{chambre.type}</h3>
-                            {!chambre.dispo && (
+                            {!dispo && dateArrivee && dateDepart && (
                               <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">
-                                {chambre.occupation ? `Occupée ${formatOccupation(chambre.occupation)}` : 'Indisponible'}
+                                Indisponible pour ces dates
                               </span>
                             )}
                             {chambre.promotion && <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">Promo {chambre.promotion.titre ? `· ${chambre.promotion.titre}` : ''}</span>}
                           </div>
-                          <p className="text-sm text-gray-500 mb-3 flex items-center gap-1">
+                          <p className="text-sm text-gray-500 mb-2 flex items-center gap-1">
                             <Users size={13} /> Jusqu'à {chambre.capacite} personnes
                           </p>
+                          {chambre.description && (
+                            <p className="text-xs text-gray-500 mb-3 leading-relaxed line-clamp-2">{chambre.description}</p>
+                          )}
                           <div className="flex flex-wrap gap-1.5">
-                            {chambre.equipements?.map(eq => (
-                              <span key={eq} className="flex items-center gap-1 text-xs bg-green-50 text-green-700 border border-green-100 px-2 py-0.5 rounded-full">
-                                <CheckCircle size={10} /> {eq}
+                            {chambre.equipements?.slice(0, 4).map(eq => (
+                              <span key={eq} className="flex items-center gap-1 text-xs bg-orange-50 text-orange-600 border border-orange-100 px-2 py-0.5 rounded-full">
+                                <CheckCircle size={10} /> {LABELS_EQ_CHAMBRE[eq] || eq}
                               </span>
                             ))}
+                            {chambre.equipements?.length > 4 && (
+                              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                                +{chambre.equipements.length - 4} autres
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="text-right shrink-0 flex flex-col justify-between items-end">
@@ -438,40 +474,31 @@ export default function DetailEtablissement() {
                               </p>
                             )}
                           </div>
+                          <button
+                            onClick={() => setChambreDetail(chambre)}
+                            className="mt-2 text-xs text-blue-600 hover:text-orange-500 font-medium transition-colors">
+                            Voir les détails
+                          </button>
                           {estBloqueParRole ? (
-                            <p className="mt-3 text-xs text-gray-400 italic text-center">
+                            <p className="mt-2 text-xs text-gray-400 italic text-center">
                               Réservation non disponible pour votre compte
                             </p>
-                          ) : !user ? (
-                            <button onClick={() => handleReserver(chambre)}
-                              disabled={!chambre.dispo}
-                              className={`mt-3 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${chambre.dispo
-                                ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md'
-                                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                              }`}>
-                              {chambre.dispo
-                                ? 'Se connecter pour réserver'
-                                : chambre.occupation ? `Libre le ${new Date(chambre.occupation.date_depart + 'T00:00:00').getDate()} ${MOIS[new Date(chambre.occupation.date_depart + 'T00:00:00').getMonth()]}` : 'Indisponible'
-                              }
-                            </button>
                           ) : (
-                            <button onClick={() => chambre.dispo && handleReserver(chambre)}
-                              disabled={!chambre.dispo}
-                              className={`mt-3 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${chambre.dispo
-                                ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow-md'
+                            <button onClick={() => dispo && handleReserver(chambre)}
+                              disabled={!dispo}
+                              className={`mt-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${dispo
+                                ? 'bg-orange-500 hover:bg-blue-600 text-white shadow-sm hover:shadow-md'
                                 : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                               }`}>
-                              {chambre.dispo
-                                ? 'Je réserve'
-                                : chambre.occupation ? `Libre le ${new Date(chambre.occupation.date_depart + 'T00:00:00').getDate()} ${MOIS[new Date(chambre.occupation.date_depart + 'T00:00:00').getMonth()]}` : 'Indisponible'
-                              }
+                              {dispo ? 'Je réserve' : 'Indisponible pour ces dates'}
                             </button>
                           )}
                         </div>
                       </div>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
 
@@ -642,7 +669,7 @@ export default function DetailEtablissement() {
                       </div>
                     </div>
                     <a href={hotel.google_maps} target="_blank" rel="noopener noreferrer"
-                      className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-colors mb-4">
+                      className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-orange-500 text-white font-bold py-3 rounded-xl transition-colors mb-4">
                       <MapPin size={18} />
                       Ouvrir dans Google Maps
                     </a>
@@ -686,7 +713,7 @@ export default function DetailEtablissement() {
                 <div className="border-2 border-gray-200 focus-within:border-blue-400 rounded-xl p-3 transition-colors">
                   <label className="text-xs text-gray-400 font-semibold block mb-0.5">ARRIVÉE</label>
                   <input type="date" value={dateArrivee}
-                    onChange={e => { setDateArrivee(e.target.value); setErreurDates(false) }}
+                    onChange={e => { setDateArrivee(e.target.value); if (dateDepart && e.target.value >= dateDepart) setDateDepart(''); setErreurDates(false) }}
                     min={new Date().toISOString().split('T')[0]}
                     className="text-sm text-gray-800 w-full outline-none font-medium cursor-pointer" />
                 </div>
@@ -694,7 +721,7 @@ export default function DetailEtablissement() {
                   <label className="text-xs text-gray-400 font-semibold block mb-0.5">DÉPART</label>
                   <input type="date" value={dateDepart}
                     onChange={e => { setDateDepart(e.target.value); setErreurDates(false) }}
-                    min={dateArrivee || new Date().toISOString().split('T')[0]}
+                    min={dateArrivee ? new Date(new Date(dateArrivee).getTime() + 86400000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
                     className="text-sm text-gray-800 w-full outline-none font-medium cursor-pointer" />
                 </div>
               </div>
@@ -712,7 +739,7 @@ export default function DetailEtablissement() {
               )}
 
               <button onClick={() => { setOnglet('chambres'); document.querySelector('.onglets')?.scrollIntoView({ behavior: 'smooth' }) }}
-                className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-black py-3.5 rounded-xl transition-all text-base shadow-md hover:shadow-lg">
+                className="w-full bg-orange-500 hover:bg-blue-600 active:bg-blue-700 text-white font-black py-3.5 rounded-xl transition-all text-base shadow-md hover:shadow-lg">
                 Voir les chambres disponibles
               </button>
 
@@ -740,6 +767,74 @@ export default function DetailEtablissement() {
           </div>
         </div>
       </div>
+      {/* Modal détail chambre */}
+      {chambreDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-black/50 backdrop-blur-sm" onClick={() => setChambreDetail(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+
+            {/* Photo */}
+            {chambreDetail.photo && (
+              <div className="h-52 overflow-hidden rounded-t-2xl">
+                <img src={chambreDetail.photo} alt={chambreDetail.type} className="w-full h-full object-cover" />
+              </div>
+            )}
+
+            <div className="p-6">
+              {/* Titre + fermer */}
+              <div className="flex items-start justify-between gap-3 mb-3">
+                <h2 className="text-xl font-bold text-gray-900">{chambreDetail.type}</h2>
+                <button onClick={() => setChambreDetail(null)} className="text-gray-400 hover:text-gray-600 shrink-0">
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Capacité + prix */}
+              <div className="flex items-center gap-4 mb-4">
+                <span className="flex items-center gap-1.5 text-sm text-gray-500">
+                  <Users size={14} /> Jusqu'à {chambreDetail.capacite} personnes
+                </span>
+                <span className="text-xl font-black text-blue-700">
+                  {Math.round(chambreDetail.prix).toLocaleString()} <span className="text-sm font-normal text-gray-400">FCFA/nuit</span>
+                </span>
+              </div>
+
+              {/* Description complète */}
+              {chambreDetail.description && (
+                <div className="mb-5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1.5">Description</p>
+                  <p className="text-sm text-gray-700 leading-relaxed">{chambreDetail.description}</p>
+                </div>
+              )}
+
+              {/* Équipements */}
+              {chambreDetail.equipements?.length > 0 && (
+                <div className="mb-5">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Équipements inclus</p>
+                  <div className="flex flex-wrap gap-2">
+                    {chambreDetail.equipements.map(eq => (
+                      <span key={eq} className="flex items-center gap-1 text-xs bg-orange-50 text-orange-600 border border-orange-100 px-2.5 py-1 rounded-full font-medium">
+                        <CheckCircle size={11} /> {LABELS_EQ_CHAMBRE[eq] || eq}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Bouton réserver */}
+              {!estBloqueParRole && (
+                <button
+                  onClick={() => { setChambreDetail(null); handleReserver(chambreDetail) }}
+                  disabled={!isDispo(chambreDetail)}
+                  className={`w-full py-3 rounded-xl text-sm font-bold transition-all ${isDispo(chambreDetail)
+                    ? 'bg-orange-500 hover:bg-blue-600 text-white'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}>
+                  {isDispo(chambreDetail) ? 'Je réserve cette chambre' : 'Indisponible pour ces dates'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   )
 }

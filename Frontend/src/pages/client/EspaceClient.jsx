@@ -3,16 +3,16 @@ import usePolling from '../../hooks/usePolling'
 import { Link, useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import {
-  Calendar, MapPin, QrCode, Star, Clock, CheckCircle, XCircle, RotateCcw,
-  ChevronRight, User, Mail, Phone, Edit3, LogOut, AlertCircle, Smartphone,
+  Calendar, CalendarCheck, MapPin, QrCode, Star, Clock, CheckCircle, XCircle, RotateCcw,
+  ChevronRight, User, Mail, Phone, Edit3, AlertCircle, Smartphone, Search,
   X, Building2, Key, Trash2, FileText, Shield, Info, Loader2, Utensils
 } from 'lucide-react'
-import Layout from '../../components/common/Layout'
+import SidebarClient from '../../components/common/SidebarClient'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
 
 const STATUTS = {
-  en_attente: { label: 'En attente', couleur: 'bg-amber-100 text-amber-700', icon: Clock },
+  en_attente: { label: 'En attente', couleur: 'bg-gray-100 text-gray-400', icon: Clock },
   payee: { label: 'Payée', couleur: 'bg-blue-100 text-blue-700', icon: CheckCircle },
   confirmee: { label: 'Confirmée', couleur: 'bg-green-100 text-green-700', icon: CheckCircle },
   en_cours: { label: 'En cours', couleur: 'bg-indigo-100 text-indigo-700', icon: Clock },
@@ -43,6 +43,7 @@ function ModalModification({ reservation, onFermer, onValider }) {
   const dansFenetre2h = heuresDepuisPaiement <= 2
 
   const [chambres, setChambres] = useState([])
+  const [chambresDispoIds, setChambresDispoIds] = useState(null)
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState('same')
   const [dateArrivee, setDateArrivee] = useState(reservation.dateArrivee)
@@ -59,6 +60,14 @@ function ModalModification({ reservation, onFermer, onValider }) {
       .catch(() => setChambres([]))
       .finally(() => setLoading(false))
   }, [])
+
+  // Recharger la disponibilité réelle quand les dates changent
+  useEffect(() => {
+    if (bloque || !dateArrivee || !dateDepart) return
+    api.get(`/hotels/${reservation.hotelId}/chambres/?date_arrivee=${dateArrivee}&date_depart=${dateDepart}`)
+      .then(res => setChambresDispoIds(new Set(res.data.map(c => c.id))))
+      .catch(() => setChambresDispoIds(null))
+  }, [dateArrivee, dateDepart])
 
   const nouvellesNuits = dateArrivee && dateDepart
     ? Math.max(1, Math.round((new Date(dateDepart) - new Date(dateArrivee)) / 86400000))
@@ -79,7 +88,7 @@ function ModalModification({ reservation, onFermer, onValider }) {
 
   const handleConfirmer = async () => {
     if (!aChange) { setErreur('Aucune modification détectée.'); return }
-    if (!telephone.trim()) { setErreur('Veuillez indiquer votre numéro Mobile Money.'); return }
+    if (difference > 0 && (!telephone.trim() || telephone.length !== 10 || !telephone.startsWith('01'))) { setErreur('Numéro Mobile Money invalide. 10 chiffres requis, commençant par 01.'); return }
     setEnvoi(true)
     setErreur('')
     const payload = {
@@ -140,13 +149,13 @@ function ModalModification({ reservation, onFermer, onValider }) {
             <div>
               <label className="text-xs text-gray-500 font-semibold block mb-1.5">Arrivée</label>
               <input type="date" value={dateArrivee} min={today}
-                onChange={e => setDateArrivee(e.target.value)}
+                onChange={e => { setDateArrivee(e.target.value); if (dateDepart && e.target.value >= dateDepart) setDateDepart(''); setErreur('') }}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400" />
             </div>
             <div>
               <label className="text-xs text-gray-500 font-semibold block mb-1.5">Départ</label>
-              <input type="date" value={dateDepart} min={dateArrivee || today}
-                onChange={e => setDateDepart(e.target.value)}
+              <input type="date" value={dateDepart} min={dateArrivee ? new Date(new Date(dateArrivee).getTime() + 86400000).toISOString().split('T')[0] : today}
+                onChange={e => { setDateDepart(e.target.value); setErreur('') }}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400" />
             </div>
           </div>
@@ -164,11 +173,11 @@ function ModalModification({ reservation, onFermer, onValider }) {
             ) : (
               <select
                 value={selectedId}
-                onChange={e => setSelectedId(e.target.value === 'same' ? 'same' : parseInt(e.target.value))}
+                onChange={e => { setSelectedId(e.target.value === 'same' ? 'same' : parseInt(e.target.value)); setErreur('') }}
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:border-blue-400 bg-white"
               >
                 <option value="same">Garder — {reservation.typeChambreNom} ({prixNuitActuel.toLocaleString()} FCFA/nuit)</option>
-                {chambres.filter(c => c.id !== reservation.typeChambreId).map(c => {
+                {chambres.filter(c => c.id !== reservation.typeChambreId && (chambresDispoIds === null ? c.est_disponible : chambresDispoIds.has(c.id))).map(c => {
                   const prixC = parseFloat(c.prix_nuit) * nouvellesNuits
                   const tag = prixC < totalActuel ? '↓ Baisse' : prixC > totalActuel ? '↑ Hausse' : '= Identique'
                   return (
@@ -237,7 +246,7 @@ function ModalModification({ reservation, onFermer, onValider }) {
           )}
 
           {/* Numéro Mobile Money */}
-          {aChange && (
+          {aChange && difference > 0 && (
             <div>
               <label className="text-xs text-gray-500 font-semibold block mb-1.5">
                 {estHausse && difference > 0 ? 'Numéro Mobile Money — prélèvement du supplément' : 'Numéro Mobile Money — remboursement'}
@@ -249,8 +258,8 @@ function ModalModification({ reservation, onFermer, onValider }) {
                   <option value="mtn">MTN</option>
                   <option value="moov">Moov</option>
                 </select>
-                <input type="tel" value={telephone} onChange={e => setTelephone(e.target.value)}
-                  placeholder="+229 XX XX XX XX"
+                <input type="tel" value={telephone} onChange={e => setTelephone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="01XXXXXXXX"
                   className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400" />
               </div>
             </div>
@@ -268,7 +277,7 @@ function ModalModification({ reservation, onFermer, onValider }) {
               Annuler
             </button>
             <button
-              disabled={!aChange || envoi}
+              disabled={!aChange || envoi || !!erreur}
               onClick={handleConfirmer}
               className={`flex-1 ${estHausse && difference > 0 ? 'bg-blue-600 hover:bg-blue-700' : 'bg-green-600 hover:bg-green-700'} disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2`}>
               {envoi && <Loader2 size={14} className="animate-spin" />}
@@ -304,7 +313,7 @@ function ModalAnnulation({ reservation, onFermer, onConfirmer }) {
 
   const handleConfirmer = async () => {
     if (!motif.trim()) { setErreur('Veuillez indiquer un motif.'); return }
-    if (remboursementEstime > 0 && !telephone.trim()) { setErreur('Veuillez indiquer votre numéro Mobile Money pour recevoir le remboursement.'); return }
+    if (remboursementEstime > 0 && (!telephone.trim() || telephone.length !== 10 || !telephone.startsWith('01'))) { setErreur('Numéro Mobile Money invalide. 10 chiffres requis, commençant par 01.'); return }
     setEnvoi(true)
     setErreur('')
     try {
@@ -402,8 +411,8 @@ function ModalAnnulation({ reservation, onFermer, onConfirmer }) {
                   <option value="mtn">MTN</option>
                   <option value="moov">Moov</option>
                 </select>
-                <input type="tel" value={telephone} onChange={e => setTelephone(e.target.value)}
-                  placeholder="+229 XX XX XX XX"
+                <input type="tel" value={telephone} onChange={e => setTelephone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="01XXXXXXXX"
                   className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400" />
               </div>
               <p className="text-xs text-gray-400 mt-1">Le remboursement de {remboursementEstime.toLocaleString()} FCFA sera versé sur ce numéro.</p>
@@ -452,14 +461,235 @@ function ModalAnnulation({ reservation, onFermer, onConfirmer }) {
   )
 }
 
+function ModalChangerMotDePasse({ onFermer, onSucces }) {
+  const [ancien, setAncien] = useState('')
+  const [nouveau, setNouveau] = useState('')
+  const [confirmer, setConfirmer] = useState('')
+  const [envoi, setEnvoi] = useState(false)
+  const [erreur, setErreur] = useState('')
+
+  const handleConfirmer = async () => {
+    if (!ancien || !nouveau || !confirmer) { setErreur('Tous les champs sont requis.'); return }
+    if (nouveau.length < 8) { setErreur('Le nouveau mot de passe doit contenir au moins 8 caractères.'); return }
+    if (nouveau !== confirmer) { setErreur('Les mots de passe ne correspondent pas.'); return }
+    setEnvoi(true)
+    setErreur('')
+    try {
+      await api.post('/auth/changer-mot-de-passe/', {
+        ancien_mot_de_passe: ancien,
+        nouveau_mot_de_passe: nouveau,
+        confirmer_mot_de_passe: confirmer,
+      })
+      onSucces()
+    } catch (err) {
+      const data = err.response?.data
+      const msg = data?.ancien_mot_de_passe || data?.nouveau_mot_de_passe || data?.detail
+        || (data ? Object.values(data)[0] : null) || 'Une erreur est survenue.'
+      setErreur(Array.isArray(msg) ? msg[0] : String(msg))
+    } finally {
+      setEnvoi(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="font-bold text-gray-900">Changer le mot de passe</h2>
+          <button onClick={onFermer} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} className="text-gray-500" /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label className="text-xs text-gray-500 font-semibold block mb-1.5">Mot de passe actuel</label>
+            <input type="password" value={ancien} onChange={e => setAncien(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 font-semibold block mb-1.5">Nouveau mot de passe</label>
+            <input type="password" value={nouveau} onChange={e => setNouveau(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 font-semibold block mb-1.5">Confirmer le nouveau mot de passe</label>
+            <input type="password" value={confirmer} onChange={e => setConfirmer(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-blue-400" />
+          </div>
+
+          {erreur && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-600 flex items-center gap-2">
+              <AlertCircle size={14} className="shrink-0" /> {erreur}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <button onClick={onFermer}
+              className="flex-1 border border-gray-200 text-gray-700 font-semibold py-3 rounded-xl text-sm hover:bg-gray-50 transition-colors">
+              Annuler
+            </button>
+            <button onClick={handleConfirmer} disabled={envoi}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
+              {envoi && <Loader2 size={14} className="animate-spin" />}
+              Confirmer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ModalSupprimerCompte({ onFermer, onSucces }) {
+  const [motDePasse, setMotDePasse] = useState('')
+  const [confirmationTexte, setConfirmationTexte] = useState('')
+  const [envoi, setEnvoi] = useState(false)
+  const [erreur, setErreur] = useState('')
+
+  const handleConfirmer = async () => {
+    if (!motDePasse) { setErreur('Veuillez saisir votre mot de passe.'); return }
+    if (confirmationTexte !== 'SUPPRIMER') { setErreur('Veuillez taper SUPPRIMER pour confirmer.'); return }
+    setEnvoi(true)
+    setErreur('')
+    try {
+      await api.post('/auth/supprimer-compte/', { mot_de_passe: motDePasse })
+      onSucces()
+    } catch (err) {
+      const data = err.response?.data
+      const msg = data?.mot_de_passe || data?.detail || 'Une erreur est survenue.'
+      setErreur(Array.isArray(msg) ? msg[0] : String(msg))
+    } finally {
+      setEnvoi(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.5)' }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <h2 className="font-bold text-gray-900">Supprimer mon compte</h2>
+          <button onClick={onFermer} className="p-1.5 hover:bg-gray-100 rounded-lg"><X size={18} className="text-gray-500" /></button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+            <AlertCircle size={18} className="text-red-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-red-700 text-sm">Action irréversible</p>
+              <p className="text-xs text-red-600 mt-1">
+                Votre compte et vos informations personnelles seront définitivement supprimés. Votre historique de réservations restera visible par les hôtels concernés mais ne sera plus rattaché à votre identité.
+              </p>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 font-semibold block mb-1.5">Mot de passe</label>
+            <input type="password" value={motDePasse} onChange={e => setMotDePasse(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400" />
+          </div>
+
+          <div>
+            <label className="text-xs text-gray-500 font-semibold block mb-1.5">
+              Tapez <span className="font-mono font-bold text-red-500">SUPPRIMER</span> pour confirmer
+            </label>
+            <input type="text" value={confirmationTexte} onChange={e => setConfirmationTexte(e.target.value)}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400" />
+          </div>
+
+          {erreur && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-600 flex items-center gap-2">
+              <AlertCircle size={14} className="shrink-0" /> {erreur}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <button onClick={onFermer}
+              className="flex-1 border border-gray-200 text-gray-700 font-semibold py-3 rounded-xl text-sm hover:bg-gray-50 transition-colors">
+              Conserver mon compte
+            </button>
+            <button onClick={handleConfirmer} disabled={envoi || confirmationTexte !== 'SUPPRIMER'}
+              className="flex-1 bg-red-500 hover:bg-red-600 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2">
+              {envoi && <Loader2 size={14} className="animate-spin" />}
+              Supprimer définitivement
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Mots interdits détectés côté client avant soumission
 const MOTS_INTERDITS = [
-  // Français
-  'merde', 'putain', 'connard', 'connasse', 'salope', 'enculé', 'encule', 'fdp', 'nique',
-  'niquer', 'conne', 'con', 'pute', 'bâtard', 'batard', 'fils de pute', 'va te faire',
-  'ta gueule', 'ferme ta gueule', 'imbécile', 'idiot', 'crétin', 'abruti', 'ntm', 'pd',
-  // Fon / Yoruba (termes vulgaires courants)
-  'ashawo', 'werey', 'oloshi', 'ode', 'kpata', 'wo wo', 'wô wô', 'ayanfe', 'olo',
+  // ── Grossièretés françaises ──
+  'merde', 'putain', 'connard', 'connasse', 'salope', 'enculé', 'encule', 'fdp',
+  'nique', 'niquer', 'conne', 'pute', 'bâtard', 'batard', 'fils de pute',
+  'ta gueule', 'ferme ta gueule', 'va te faire foutre', 'va te faire',
+  'couille', 'bite', 'chier', 'chiotte', 'branler', 'branleur', 'branlette',
+  'fumier', 'ordure', 'porc', 'cochon', 'salopard', 'saloperie',
+  'ntm', 'pd', 'gouine', 'tapette', 'va mourir', 'crève',
+
+  // ── Insultes sur la compétence / malhonnêteté ──
+  'arnaqueur', 'arnaque', 'escroc', 'escroquerie', 'voleur', 'voleuse', 'voleurs',
+  'menteur', 'menteuse', 'fraudeur', 'fraudeuse', 'fraude', 'corrompu', 'corrupt',
+  'incompétent', 'incompétente', 'incapable', 'nul', 'nulle', 'zéro', 'minus',
+  'paresseux', 'paresseuse', 'fainéant', 'fainéante', 'bon à rien', 'bonne à rien',
+  'manipulateur', 'manipulatrice', 'hypocrite', 'malhonnête', 'traître', 'traîtresse',
+  'imposteur', 'charlatan', 'bandit', 'brigand', 'racket', 'racketteur',
+
+  // ── Insultes sur l'hygiène / l'état ──
+  'dégueulasse', 'crade', 'crasseux', 'crasseuse', 'infesté', 'infestée',
+  'pouilleux', 'pouilleuse', 'miteux', 'miteuse', 'sordide', 'immonde',
+  'répugnant', 'répugnante', 'infect', 'puant', 'puante',
+
+  // ── Insultes d'intelligence ──
+  'imbécile', 'idiot', 'idiote', 'crétin', 'crétine', 'abruti', 'abrutie',
+  'débile', 'demeuré', 'demeurée', 'attardé', 'attardée', 'mongol', 'simplet',
+  'âne', 'baudet', 'ignorant', 'analphabète',
+
+  // ── Menaces ──
+  'je vais te', 'on va te', 'tu vas voir', 'tu vas le regretter', 'gare à toi',
+  'tu vas payer', 'je vais vous', 'on va vous', 'je te jure', 'je te promets que',
+  'je vais détruire', 'je vais signaler', 'je vais ruiner', 'porter plainte contre',
+  'je vais poster', 'je vais publier partout',
+
+  // ── Insultes familiales ──
+  'ta mère', 'ton père', 'ta famille', 'famille de', 'race de', 'engeance',
+  'bâtard de', 'fils de', 'fille de',
+
+  // ── Insultes raciales / ethniques (à filtrer) ──
+  'sale noir', 'sale blanc', 'sale yovo', 'yovo sal', 'négro', 'nègre', 'toubab',
+  'sale toubab', 'raciste', 'xénophobe',
+
+  // ── Argot béninois / africain français ──
+  'go chercher', 'dégage', 'casse-toi', 'fous le camp', 'dégages de là',
+  'gros naze', 'naze', 'looser', 'loser', 'bouffon', 'clown', 'guignol',
+  'je m\'en fous', 'charlatans', 'gbèzounmè', 'gnon', 'wayo', 'wayô',
+  'akpan', 'aboki sale', 'milieu de voleurs', 'bordel',
+
+  // ── Anglais ──
+  'fuck', 'fucking', 'shit', 'bullshit', 'asshole', 'bastard', 'bitch',
+  'damn', 'crap', 'whore', 'slut', 'stupid', 'fool', 'dumbass', 'idiot',
+  'shut up', 'moron', 'jerk', 'scumbag', 'scammer', 'thief', 'liar',
+  'disgusting', 'pathetic', 'useless', 'worthless', 'trash', 'garbage',
+  'terrible', 'horrible', 'awful',
+
+  // ── Fon / Goun (Bénin sud) ──
+  'wê wê', 'gbeto', 'kpakpa', 'gbê gbê', 'a to bo', 'mi kpe bo',
+  'afin', 'alodji', 'gbigba', 'vo nudo', 'azan do we', 'fon non',
+  'do non', 'ko gbê', 'hun mi', 'kpé azan', 'mi na we', 'akpà',
+  'gbeto do', 'agbanlin', 'wlovi', 'aziza', 'do kpé',
+
+  // ── Yoruba / Nago (courant au Bénin) ──
+  'ashawo', 'werey', 'oloshi', 'ode', 'kpata', 'oshi', 'olosho', 'ole',
+  'were', 'agbaya', 'ori e daru', 'idinwo', 'omo ale', 'ode buruku',
+  'oloriburuku', 'eranko', 'asin', 'aparo', 'omu', 'orun re', 'iya e',
+  'baba e', 'gbomo', 'omo ibon', 'jati jati', 'omo buruku',
+
+  // ── Mina / Ewe (côte béninoise) ──
+  'gbedze', 'nyonuvi', 'atike', 'lo vi', 'devi', 'nyonu kple',
+  'ame vovi', 'wu mi', 'kuku', 'ame nyui melo',
+
+  // ── Dendi / Bariba / Peul (nord Bénin) ──
+  'banzari', 'mahaukaci', 'karuwanci', 'wawa', 'banza', 'gwauron',
+  'karuwa', 'dundumi', 'hauka', 'iska', 'dan iska', 'gidan iska',
 ]
 
 function contientMotInterdit(texte) {
@@ -481,7 +711,7 @@ function formatCountdown(sec) {
 function CarteReservation({ reservation, onConfirmerSejour, onModifier, onAnnuler, onNotif }) {
   const [qrOuvert, setQrOuvert] = useState(false)
   // Avis
-  const [localAvisDisponible, setLocalAvisDisponible] = useState(reservation.avisDisponible || false)
+  const [localAvisDisponible, setLocalAvisDisponible] = useState(reservation.avisDisponible || reservation.statut === 'terminee')
   const [avisModalOuvert, setAvisModalOuvert] = useState(false)
   const [note, setNote] = useState(0)
   const [commentaire, setCommentaire] = useState('')
@@ -492,6 +722,13 @@ function CarteReservation({ reservation, onConfirmerSejour, onModifier, onAnnule
   const [avisEnvoi, setAvisEnvoi] = useState(false)
   const [avisErreur, setAvisErreur] = useState('')
   const [secondesRestantes, setSecondesRestantes] = useState(null)
+
+  // Sync localAvisDisponible dès que le parent signale avisDisponible=true (ex: après double confirmation)
+  useEffect(() => {
+    if (reservation.avisDisponible && !localAvisDisponible) {
+      setLocalAvisDisponible(true)
+    }
+  }, [reservation.avisDisponible])
 
   // Countdown post-séjour
   useEffect(() => {
@@ -672,11 +909,11 @@ function CarteReservation({ reservation, onConfirmerSejour, onModifier, onAnnule
         {/* QR Code */}
         {qrOuvert && (
           <div className="mt-3 pt-3 border-t border-gray-50 flex items-center gap-4">
-            <QRMini valeur={reservation.id} />
+            <QRMini valeur={String(reservation.numero)} />
             <div>
               <p className="text-xs font-semibold text-gray-800">QR Code de check-in</p>
-              <p className="text-xs text-gray-400 mt-0.5">Présentez à la réception à l'arrivée</p>
-              <p className="text-xs text-blue-600 font-mono mt-1">{reservation.id}</p>
+              <p className="text-xs text-gray-400 mt-0.5">Scannez pour afficher votre N° de réservation</p>
+              <p className="text-xs text-blue-600 font-mono mt-1 break-all">{reservation.numero}</p>
             </div>
           </div>
         )}
@@ -783,12 +1020,15 @@ function CarteReservation({ reservation, onConfirmerSejour, onModifier, onAnnule
 
 export default function EspaceClient() {
   const { user, logout } = useAuth()
+  const navigate = useNavigate()
   const [onglet, setOnglet] = useState('reservations')
   const [filtreStatut, setFiltreStatut] = useState('tous')
   const [reservations, setReservations] = useState([])
   const [chargementRes, setChargementRes] = useState(true)
   const [modalModif, setModalModif] = useState(null)
   const [modalAnnul, setModalAnnul] = useState(null)
+  const [modalMotDePasse, setModalMotDePasse] = useState(false)
+  const [modalSupprimer, setModalSupprimer] = useState(false)
   const [notif, setNotif] = useState(null)
 
   // Charger les vraies réservations depuis le backend
@@ -833,7 +1073,11 @@ export default function EspaceClient() {
       const res = await api.post(`/reservations/${id}/confirmer-sejour/`)
       const nouveauStatut = res.data.statut
       setReservations(prev => prev.map(r =>
-        r.id === id ? { ...r, statut: nouveauStatut } : r
+        r.id === id ? {
+          ...r,
+          statut: nouveauStatut,
+          avisDisponible: nouveauStatut === 'terminee' ? true : r.avisDisponible,
+        } : r
       ))
       afficherNotif(res.data.message)
     } catch (err) {
@@ -871,22 +1115,49 @@ export default function EspaceClient() {
     setModalAnnul(null)
   }
 
-  const reservationsFiltrees = filtreStatut === 'tous'
+  const motDePasseChange = () => {
+    setModalMotDePasse(false)
+    afficherNotif('Mot de passe modifié avec succès.')
+  }
+
+  const compteSupprime = () => {
+    setModalSupprimer(false)
+    logout()
+    navigate('/')
+  }
+
+  const reservationsFiltrees = (filtreStatut === 'tous'
     ? reservations
     : reservations.filter(r => r.statut === filtreStatut)
+  ).filter(r => r.statut !== 'en_attente')
 
   const nbAConfirmer = reservations.filter(r => ['a_confirmer', 'confirme_hotel'].includes(r.statut)).length
 
   const stats = {
-    total: reservations.length,
+    total: reservations.filter(r => r.statut !== 'en_attente').length,
     confirmees: reservations.filter(r => ['payee', 'confirmee', 'en_cours'].includes(r.statut)).length,
     aConfirmer: nbAConfirmer,
-    depense: reservations.filter(r => !['annulee', 'remboursee'].includes(r.statut)).reduce((s, r) => s + r.total, 0),
   }
 
+  const aujourdhui = new Date()
+  aujourdhui.setHours(0, 0, 0, 0)
+  const prochaineRes = reservations
+    .filter(r => ['payee', 'confirmee', 'en_cours'].includes(r.statut) && new Date(r.dateArrivee) >= aujourdhui)
+    .sort((a, b) => new Date(a.dateArrivee) - new Date(b.dateArrivee))[0]
+  const joursAvant = prochaineRes
+    ? Math.ceil((new Date(prochaineRes.dateArrivee) - aujourdhui) / (1000 * 60 * 60 * 24))
+    : null
+  const affichageProchain = joursAvant === null
+    ? 'Aucun séjour'
+    : joursAvant === 0 ? "Aujourd'hui !"
+    : joursAvant === 1 ? 'Demain'
+    : `Dans ${joursAvant} j.`
+
   return (
-    <Layout>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="flex min-h-screen bg-gray-50">
+      <SidebarClient onglet={onglet} setOnglet={setOnglet} user={user} logout={logout} nbAConfirmer={nbAConfirmer} />
+
+      <div className="flex-1 min-w-0 p-6 lg:p-8">
 
         {/* Notification */}
         {notif && (
@@ -896,14 +1167,13 @@ export default function EspaceClient() {
         )}
 
         {/* En-tête */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-start justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Bonjour, {user?.prenom || 'Jean'}</h1>
-            <p className="text-gray-400 text-sm mt-0.5">Bienvenue dans votre espace personnel</p>
+            <h1 className="text-2xl font-black text-gray-900">
+              {onglet === 'reservations' ? 'Mes réservations' : 'Mon profil'}
+            </h1>
+            <p className="text-gray-400 text-sm mt-1">Bonjour, {user?.prenom || 'Jean'}</p>
           </div>
-          <button onClick={logout} className="flex items-center gap-2 text-gray-400 hover:text-red-500 text-sm transition-colors">
-            <LogOut size={16} /> Déconnexion
-          </button>
         </div>
 
         {/* Alerte séjours à confirmer */}
@@ -922,39 +1192,41 @@ export default function EspaceClient() {
         )}
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {[
-            { label: 'Réservations', valeur: stats.total, couleur: 'text-blue-600' },
-            { label: 'À venir', valeur: stats.confirmees, couleur: 'text-green-600' },
-            { label: 'À confirmer', valeur: stats.aConfirmer, couleur: stats.aConfirmer > 0 ? 'text-purple-600' : 'text-gray-400' },
-            { label: 'Total dépensé', valeur: stats.depense.toLocaleString() + ' FCFA', couleur: 'text-blue-600' },
+            { label: 'Réservations', valeur: stats.total, icon: Calendar, couleur: 'text-blue-600', bg: 'bg-blue-50', barre: 'bg-blue-500' },
+            { label: 'À venir', valeur: stats.confirmees, icon: CheckCircle, couleur: 'text-orange-500', bg: 'bg-orange-50', barre: 'bg-orange-500' },
+            { label: 'À confirmer', valeur: stats.aConfirmer, icon: AlertCircle, couleur: stats.aConfirmer > 0 ? 'text-purple-600' : 'text-gray-400', bg: stats.aConfirmer > 0 ? 'bg-purple-50' : 'bg-gray-50', barre: stats.aConfirmer > 0 ? 'bg-purple-500' : 'bg-gray-200' },
+            { label: 'Prochain séjour', valeur: affichageProchain, icon: CalendarCheck, couleur: joursAvant !== null ? 'text-emerald-600' : 'text-gray-400', bg: joursAvant !== null ? 'bg-emerald-50' : 'bg-gray-50', barre: joursAvant !== null ? 'bg-emerald-500' : 'bg-gray-200', petit: true },
           ].map((s, i) => (
-            <div key={i} className={`bg-white rounded-2xl border p-4 text-center ${i === 2 && stats.aConfirmer > 0 ? 'border-purple-200' : 'border-gray-100'}`}>
-              <p className={`text-xl font-black ${s.couleur}`}>{s.valeur}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
+            <div key={i} className={`bg-white rounded-2xl border overflow-hidden shadow-sm hover:shadow-md transition-shadow ${i === 2 && stats.aConfirmer > 0 ? 'border-purple-200' : 'border-gray-100'}`}>
+              <div className={`h-1 w-full ${s.barre}`} />
+              <div className="p-5">
+                <div className={`w-10 h-10 ${s.bg} rounded-xl flex items-center justify-center mb-3`}>
+                  <s.icon size={20} className={s.couleur} />
+                </div>
+                <p className={`${s.petit ? 'text-base' : 'text-xl'} font-black ${s.couleur}`}>{s.valeur}</p>
+                <p className="text-xs text-gray-400 mt-0.5">{s.label}</p>
+              </div>
             </div>
-          ))}
-        </div>
-
-        {/* Onglets */}
-        <div className="flex bg-gray-100 rounded-xl p-1 mb-6 w-fit">
-          {[{ id: 'reservations', label: 'Mes réservations' }, { id: 'profil', label: 'Mon profil' }].map(o => (
-            <button key={o.id} onClick={() => setOnglet(o.id)}
-              className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${onglet === o.id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>
-              {o.label}
-            </button>
           ))}
         </div>
 
         {/* RÉSERVATIONS */}
         {onglet === 'reservations' && (
-          <div>
-            <div className="flex flex-wrap gap-2 mb-5">
+          <div className="bg-white rounded-2xl border border-gray-100">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+              <h2 className="font-bold text-gray-900">Historique des réservations</h2>
+              <Link to="/recherche" className="flex items-center gap-2 bg-orange-500 hover:bg-blue-600 text-white text-sm font-bold px-4 py-2 rounded-xl transition-colors shadow-sm">
+                <Search size={15} /> Nouvelle réservation
+              </Link>
+            </div>
+
+            <div className="flex flex-wrap gap-2 px-5 py-4 border-b border-gray-50">
               {[
                 { val: 'tous', label: 'Toutes' },
                 { val: 'payee', label: 'Payées' },
                 { val: 'confirmee', label: 'Confirmées' },
-                { val: 'en_attente', label: 'En attente' },
                 { val: 'terminee', label: 'Terminées' },
                 { val: 'annulee', label: 'Annulées' },
               ].map(f => (
@@ -967,6 +1239,7 @@ export default function EspaceClient() {
               ))}
             </div>
 
+            <div className="p-5">
             {chargementRes ? (
               <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
                 <Loader2 size={32} className="text-blue-500 mx-auto mb-3 animate-spin" />
@@ -996,76 +1269,96 @@ export default function EspaceClient() {
                 ))}
               </div>
             )}
-
-            <div className="mt-6 text-center">
-              <Link to="/recherche"
-                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-xl text-sm transition-colors">
-                Réserver un nouvel hébergement <ChevronRight size={16} />
-              </Link>
             </div>
           </div>
         )}
 
         {/* PROFIL */}
         {onglet === 'profil' && (
-          <div className="max-w-xl">
-            <div className="bg-white rounded-2xl border border-gray-100 p-6 mb-5">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="font-bold text-gray-900">Informations personnelles</h2>
-                <button className="flex items-center gap-1.5 text-xs text-blue-600 hover:underline">
-                  <Edit3 size={13} /> Modifier
-                </button>
-              </div>
-              <div className="flex items-center gap-4 mb-5 pb-5 border-b border-gray-50">
-                <div className="w-14 h-14 bg-blue-100 rounded-2xl flex items-center justify-center">
-                  <span className="text-2xl font-black text-blue-600">
-                    {(user?.prenom || 'J')[0]}{(user?.nom || 'D')[0]}
-                  </span>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            {/* Colonne gauche — résumé */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="h-20 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 relative">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -translate-y-16 translate-x-16" />
                 </div>
-                <div>
-                  <p className="font-bold text-gray-900">{user?.prenom} {user?.nom}</p>
-                  <p className="text-xs text-gray-400">Client PHAROS</p>
-                </div>
-              </div>
-              <div className="space-y-4 text-sm">
-                {[
-                  { icon: User, label: 'Prénom', valeur: user?.prenom || 'Jean' },
-                  { icon: User, label: 'Nom', valeur: user?.nom || 'Dupont' },
-                  { icon: Mail, label: 'Email', valeur: user?.email || 'jean@email.com' },
-                  { icon: Phone, label: 'Téléphone', valeur: user?.telephone || '+229 97 00 00 00' },
-                ].map((champ, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <champ.icon size={15} className="text-gray-400 shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-400">{champ.label}</p>
-                      <p className="font-medium text-gray-800">{champ.valeur}</p>
-                    </div>
+                <div className="px-6 pb-6 text-center">
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg border-4 border-white mx-auto -mt-10 mb-4">
+                    <span className="text-2xl font-black text-white">
+                      {(user?.prenom || 'J')[0]}{(user?.nom || 'D')[0]}
+                    </span>
                   </div>
-                ))}
+                  <p className="font-bold text-gray-900 text-lg">{user?.prenom} {user?.nom}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{user?.email}</p>
+                  <span className="inline-flex items-center gap-1 mt-3 bg-blue-50 text-blue-600 text-xs font-semibold px-3 py-1 rounded-full">
+                    Client PHAROS
+                  </span>
+                  {user?.date_joined && (
+                    <div className="mt-5 pt-4 border-t border-gray-50 flex items-center justify-center gap-1.5 text-xs text-gray-400">
+                      <Calendar size={12} />
+                      Membre depuis {new Date(user.date_joined).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-            <div className="bg-white rounded-2xl border border-gray-100 p-6">
-              <h2 className="font-bold text-gray-900 mb-4">Sécurité</h2>
-              <button className="flex items-center justify-between w-full py-3 border-b border-gray-50 group">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center"><Key size={16} className="text-gray-500" /></div>
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-gray-800">Changer le mot de passe</p>
-                    <p className="text-xs text-gray-400">Dernière modification : il y a 3 mois</p>
-                  </div>
+
+            {/* Colonne droite */}
+            <div className="lg:col-span-2 space-y-6">
+
+              {/* Carte infos */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <div className="flex items-center justify-between mb-5">
+                  <h2 className="font-bold text-gray-900">Informations personnelles</h2>
+                  <button className="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-semibold border border-blue-100 hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors">
+                    <Edit3 size={12} /> Modifier
+                  </button>
                 </div>
-                <ChevronRight size={16} className="text-gray-400 group-hover:text-gray-600" />
-              </button>
-              <button className="flex items-center justify-between w-full py-3 group">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center"><Trash2 size={16} className="text-red-400" /></div>
-                  <div className="text-left">
-                    <p className="text-sm font-medium text-red-500">Supprimer mon compte</p>
-                    <p className="text-xs text-gray-400">Action irréversible</p>
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {[
+                    { icon: User, label: 'Prénom', valeur: user?.prenom || 'Jean' },
+                    { icon: User, label: 'Nom', valeur: user?.nom || 'Dupont' },
+                    { icon: Mail, label: 'Email', valeur: user?.email || 'jean@email.com' },
+                    { icon: Phone, label: 'Téléphone', valeur: user?.telephone || '+229 97 00 00 00' },
+                  ].map((champ, i) => (
+                    <div key={i} className="bg-gray-50 rounded-xl p-4">
+                      <p className="text-xs text-gray-400 flex items-center gap-1.5 mb-1.5">
+                        <champ.icon size={12} /> {champ.label}
+                      </p>
+                      <p className="font-semibold text-gray-800 text-sm truncate">{champ.valeur}</p>
+                    </div>
+                  ))}
                 </div>
-                <ChevronRight size={16} className="text-gray-400 group-hover:text-gray-600" />
-              </button>
+              </div>
+
+              {/* Carte sécurité */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <h2 className="font-bold text-gray-900 mb-4">Sécurité</h2>
+                <button onClick={() => setModalMotDePasse(true)}
+                  className="flex items-center justify-between w-full py-3 border-b border-gray-50 group">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center"><Key size={16} className="text-blue-500" /></div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-gray-800">Changer le mot de passe</p>
+                      <p className="text-xs text-gray-400">Mettre à jour votre mot de passe de connexion</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-gray-400 group-hover:text-gray-600" />
+                </button>
+                <button onClick={() => setModalSupprimer(true)}
+                  className="flex items-center justify-between w-full py-3 group">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 bg-red-50 rounded-lg flex items-center justify-center"><Trash2 size={16} className="text-red-500" /></div>
+                    <div className="text-left">
+                      <p className="text-sm font-medium text-red-500">Supprimer mon compte</p>
+                      <p className="text-xs text-gray-400">Action irréversible</p>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-gray-400 group-hover:text-gray-600" />
+                </button>
+              </div>
+
             </div>
           </div>
         )}
@@ -1086,6 +1379,20 @@ export default function EspaceClient() {
           onConfirmer={confirmerAnnulation}
         />
       )}
-    </Layout>
+
+      {modalMotDePasse && (
+        <ModalChangerMotDePasse
+          onFermer={() => setModalMotDePasse(false)}
+          onSucces={motDePasseChange}
+        />
+      )}
+
+      {modalSupprimer && (
+        <ModalSupprimerCompte
+          onFermer={() => setModalSupprimer(false)}
+          onSucces={compteSupprime}
+        />
+      )}
+    </div>
   )
 }

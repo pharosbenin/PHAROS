@@ -80,6 +80,9 @@ class ReservationDetailSerializer(serializers.ModelSerializer):
     hotel_id = serializers.IntegerField(source='hotel.id', read_only=True)
     hotel_nom = serializers.CharField(source='hotel.nom', read_only=True)
     hotel_ville = serializers.CharField(source='hotel.ville', read_only=True)
+    hotel_taux_annulation = serializers.IntegerField(source='hotel.taux_annulation', read_only=True)
+    hotel_taux_modification = serializers.IntegerField(source='hotel.taux_modification', read_only=True)
+    type_chambre_id = serializers.IntegerField(source='type_chambre.id', read_only=True)
     type_chambre_nom = serializers.CharField(source='type_chambre.nom', read_only=True)
     nb_nuits = serializers.ReadOnlyField()
     paiement = PaiementSerializer(read_only=True)
@@ -87,10 +90,12 @@ class ReservationDetailSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Reservation
-        fields = ('id', 'numero', 'hotel_id', 'hotel_nom', 'hotel_ville', 'type_chambre_nom',
+        fields = ('id', 'numero', 'hotel_id', 'hotel_nom', 'hotel_ville',
+                  'hotel_taux_annulation', 'hotel_taux_modification',
+                  'type_chambre_id', 'type_chambre_nom',
                   'nom_client', 'prenom_client', 'email_client', 'telephone_client',
                   'date_arrivee', 'date_depart', 'nb_nuits', 'nb_adultes', 'nb_enfants',
-                  'prix_total', 'statut', 'notes', 'paiement', 'qrcode', 'date_creation')
+                  'prix_total', 'statut', 'avis_disponible', 'notes', 'paiement', 'qrcode', 'date_creation')
 
 
 class ReservationCreerSerializer(serializers.ModelSerializer):
@@ -108,8 +113,18 @@ class ReservationCreerSerializer(serializers.ModelSerializer):
         chambre = attrs['type_chambre']
         if chambre.hotel != attrs['hotel']:
             raise serializers.ValidationError({'type_chambre': "Cette chambre n'appartient pas à cet hôtel."})
-        if not chambre.est_disponible:
-            raise serializers.ValidationError({'type_chambre': "Cette chambre n'est plus disponible."})
+        # Vérification par chevauchement de dates : une chambre avec nombre_chambres > 1
+        # peut accueillir plusieurs réservations simultanées tant qu'il y a de la capacité.
+        reservations_overlapping = Reservation.objects.filter(
+            type_chambre=chambre,
+            statut__in=['payee', 'confirmee', 'en_cours', 'confirme_client', 'confirme_hotel'],
+            date_arrivee__lt=attrs['date_depart'],
+            date_depart__gte=attrs['date_arrivee'],
+        ).count()
+        if reservations_overlapping >= chambre.nombre_chambres:
+            raise serializers.ValidationError(
+                {'type_chambre': "Cette chambre n'est plus disponible pour les dates choisies."}
+            )
         return attrs
 
     def create(self, validated_data):

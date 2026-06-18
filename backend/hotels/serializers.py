@@ -1,3 +1,4 @@
+import re
 from rest_framework import serializers
 from .models import Hotel, TypeChambre, PhotoHotel, PhotoChambre, PlatMenu, CommandeRestaurant, LigneCommande, Promotion
 
@@ -56,11 +57,10 @@ class TypeChambreSerializer(serializers.ModelSerializer):
         return None
 
     def get_occupation_actuelle(self, obj):
-        if obj.est_disponible:
-            return None
         from django.utils import timezone
         from reservations.models import Reservation
         today = timezone.now().date()
+        # Prochaine réservation active à partir d'aujourd'hui
         res = Reservation.objects.filter(
             type_chambre=obj,
             statut__in=['payee', 'confirmee', 'en_cours', 'confirme_client', 'confirme_hotel'],
@@ -90,9 +90,15 @@ class TypeChambreEcrireSerializer(serializers.ModelSerializer):
 
 
 class HotelListeSerializer(serializers.ModelSerializer):
-    photo_principale = serializers.ImageField(read_only=True)
+    photo_principale = serializers.SerializerMethodField()
     gestionnaire_nom = serializers.CharField(source='gestionnaire.nom_complet', read_only=True)
     etoiles = serializers.SerializerMethodField()
+
+    def get_photo_principale(self, obj):
+        premiere_photo = obj.photos.first()
+        if premiere_photo:
+            return premiere_photo.image.url
+        return obj.photo_principale.url if obj.photo_principale else None
 
     def get_etoiles(self, obj):
         note = float(obj.note_moyenne or 0)
@@ -122,6 +128,9 @@ class HotelListeSerializer(serializers.ModelSerializer):
         data['prix_min'] = prix_min
         data['prix_min_original'] = prix_min_original
         data['a_promotion'] = a_promotion
+        data['capacite_max'] = max(
+            (c.capacite for c in instance.types_chambres.all()), default=0
+        )
         return data
 
     class Meta:
@@ -132,10 +141,16 @@ class HotelListeSerializer(serializers.ModelSerializer):
                   'etoiles', 'taux_annulation', 'taux_modification', 'delai_gratuit')
 
 
+def valider_telephone_benin(value):
+    if value and not re.fullmatch(r'0[0-9]{9}', value):
+        raise serializers.ValidationError("Numéro invalide. 10 chiffres requis, commençant par 0.")
+
+
 class HotelDetailSerializer(serializers.ModelSerializer):
     photos = PhotoHotelSerializer(many=True, read_only=True)
     types_chambres = TypeChambreSerializer(many=True, read_only=True)
     gestionnaire_nom = serializers.CharField(source='gestionnaire.nom_complet', read_only=True)
+    telephone = serializers.CharField(required=False, allow_blank=True, validators=[valider_telephone_benin])
 
     class Meta:
         model = Hotel
@@ -148,6 +163,8 @@ class HotelDetailSerializer(serializers.ModelSerializer):
 
 
 class HotelCreerSerializer(serializers.ModelSerializer):
+    telephone = serializers.CharField(required=False, allow_blank=True, validators=[valider_telephone_benin])
+
     class Meta:
         model = Hotel
         fields = ('id', 'nom', 'description', 'adresse', 'ville', 'quartier',

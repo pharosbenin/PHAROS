@@ -243,7 +243,7 @@ export default function Accueil() {
                   <Calendar size={17} className="text-[#F57C2B] shrink-0" />
                   <div className="flex-1 min-w-0">
                     <label className="text-xs text-gray-400 font-semibold block">Arrivée</label>
-                    <input type="date" value={dateArrivee} onChange={(e) => setDateArrivee(e.target.value)}
+                    <input type="date" value={dateArrivee} onChange={e => { setDateArrivee(e.target.value); if (dateDepart && e.target.value >= dateDepart) setDateDepart('') }}
                       min={new Date().toISOString().split('T')[0]}
                       className="w-full bg-transparent text-gray-800 text-sm font-medium outline-none" />
                   </div>
@@ -254,7 +254,7 @@ export default function Accueil() {
                   <div className="flex-1 min-w-0">
                     <label className="text-xs text-gray-400 font-semibold block">Départ</label>
                     <input type="date" value={dateDepart} onChange={(e) => setDateDepart(e.target.value)}
-                      min={dateArrivee || new Date().toISOString().split('T')[0]}
+                      min={dateArrivee ? new Date(new Date(dateArrivee).getTime() + 86400000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
                       className="w-full bg-transparent text-gray-800 text-sm font-medium outline-none" />
                   </div>
                 </div>

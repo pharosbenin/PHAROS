@@ -27,7 +27,32 @@ const TYPES_ETABLISSEMENT = [
   { id: 'auberge', label: 'Auberge' },
 ]
 
-const VILLES = ['Cotonou', 'Porto-Novo', 'Parakou', 'Abomey-Calavi', 'Djougou', 'Bohicon', 'Kandi', 'Lokossa', 'Ouidah', 'Natitingou', 'Dassa-Zoumè', 'Abomey', 'Nikki', 'Malanville']
+const VILLES = [
+  // Littoral
+  'Cotonou',
+  // Ouémé
+  'Porto-Novo', 'Adjohoun', 'Akpro-Missérété', 'Avrankou', 'Bonou', 'Dangbo', 'Missérété', 'Sèmè-Kpodji',
+  // Atlantique
+  'Abomey-Calavi', 'Allada', 'Ouidah', 'Kpomassè', 'Sô-Ava', 'Toffo', 'Tori-Bossito', 'Zè',
+  // Borgou
+  'Parakou', 'Bembèrèkè', 'Kalalé', "N'Dali", 'Nikki', 'Pèrèrè', 'Sinendé', 'Tchaourou',
+  // Zou
+  'Abomey', 'Bohicon', 'Agbangnizoun', 'Covè', 'Djidja', 'Ouinhi', 'Zagnanado', 'Za-Kpota', 'Zogbodomè',
+  // Collines
+  'Dassa-Zoumè', 'Glazoué', 'Bantè', 'Ouèssè', 'Savalou', 'Savè',
+  // Atacora
+  'Natitingou', 'Boukoumbé', 'Cobly', 'Copargo', 'Kérou', 'Kouandé', 'Matéri', 'Péhunco', 'Tanguiéta', 'Toukountouna',
+  // Alibori
+  'Malanville', 'Banikoara', 'Gogounou', 'Kandi', 'Karimama', 'Ségbana',
+  // Donga
+  'Djougou', 'Bassila', 'Ouaké',
+  // Mono
+  'Lokossa', 'Athiémé', 'Bopa', 'Comè', 'Grand-Popo', 'Houéyogbé',
+  // Couffo
+  'Aplahoué', 'Djakotomey', 'Dogbo', 'Klouékanmè', 'Lalo', 'Toviklin',
+  // Plateau
+  'Kétou', 'Pobè', 'Sakété', 'Adja-Ouèrè', 'Ifangni',
+]
 
 export default function GestionEtablissement() {
   const { hotelActif } = useHotelActif()
@@ -357,7 +382,7 @@ export default function GestionEtablissement() {
                 <h2 className="font-bold text-gray-900 mb-5">Contacts</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {[
-                    { champ: 'telephone', label: 'Téléphone', icon: Phone, placeholder: '+229 XX XX XX XX', type: 'tel' },
+                    { champ: 'telephone', label: 'Téléphone', icon: Phone, placeholder: '01XXXXXXXX', type: 'tel' },
                     { champ: 'email', label: 'Email', icon: Mail, placeholder: 'contact@hotel.bj', type: 'email' },
                     { champ: 'site_web', label: 'Site web', icon: Globe, placeholder: 'https://hotel.bj', type: 'text' },
                   ].map(c => (
@@ -365,8 +390,10 @@ export default function GestionEtablissement() {
                       <label className="text-xs text-gray-500 font-medium block mb-1.5">{c.label}</label>
                       <div className="relative">
                         <c.icon size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                        <input type={c.type} value={form[c.champ]} onChange={e => setChamp(c.champ, e.target.value)}
+                        <input type={c.type} value={form[c.champ]}
+                          onChange={e => setChamp(c.champ, c.champ === 'telephone' ? e.target.value.replace(/\D/g, '').slice(0, 10) : e.target.value)}
                           placeholder={c.placeholder}
+                          maxLength={c.champ === 'telephone' ? 10 : undefined}
                           className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:border-blue-400" />
                       </div>
                     </div>
@@ -379,7 +406,13 @@ export default function GestionEtablissement() {
           {onglet === 'photos' && (
             <div className="bg-white rounded-2xl border border-gray-100 p-6">
               <h2 className="font-bold text-gray-900 mb-2">Photos de l'établissement</h2>
-              <p className="text-xs text-gray-400 mb-5">Ajoutez jusqu'à 10 photos. La première sera utilisée comme photo principale.</p>
+              <p className="text-xs text-gray-400 mb-1">
+                {estPro
+                  ? `Abonnement Pro — jusqu'à 15 photos. (${photos.length}/15)`
+                  : `Abonnement standard — jusqu'à 5 photos. (${photos.length}/5)`}
+              </p>
+              {!estPro && <p className="text-xs text-blue-500 mb-5">Passez en Pro pour ajouter jusqu'à 15 photos.</p>}
+              {estPro && <p className="text-xs text-gray-400 mb-5">La première sera utilisée comme photo principale.</p>}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {photos.map((photo, i) => (
                   <div key={photo.tempId || photo.id || i} className="relative aspect-video bg-gray-100 rounded-xl overflow-hidden">
@@ -397,7 +430,7 @@ export default function GestionEtablissement() {
                     )}
                   </div>
                 ))}
-                {photos.length < 10 && (
+                {photos.length < (estPro ? 15 : 5) && (
                   <label className="aspect-video border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-300 hover:bg-blue-50 transition-colors group">
                     <Upload size={24} className="text-gray-300 group-hover:text-blue-400 mb-2" />
                     <p className="text-xs text-gray-400 group-hover:text-blue-500 text-center">Ajouter une photo</p>

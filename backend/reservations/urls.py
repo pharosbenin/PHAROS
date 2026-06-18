@@ -7,6 +7,7 @@ urlpatterns = [
     path('reservations/<uuid:numero>/', views.detail_reservation, name='detail_reservation'),
     path('reservations/<uuid:numero>/paiement/', views.initier_paiement, name='initier_paiement'),
     path('reservations/<uuid:numero>/qrcode/', views.qrcode_reservation, name='qrcode'),
+    path('recu-qr/<uuid:code>/', views.recu_par_qrcode, name='recu_par_qrcode'),
     path('reservations/<uuid:numero>/annuler/', views.demander_annulation, name='annuler'),
     path('reservations/<uuid:numero>/modifier/', views.demander_modification, name='modifier'),
     path('reservations/<uuid:numero>/confirmer-sejour/', views.confirmer_sejour_client, name='confirmer_sejour_client'),

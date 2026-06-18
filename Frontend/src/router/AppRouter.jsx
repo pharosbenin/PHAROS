@@ -10,8 +10,11 @@ import DetailEtablissement from '../pages/public/DetailEtablissement'
 import Reservation from '../pages/public/Reservation'
 import Paiement from '../pages/public/Paiement'
 import Confirmation from '../pages/public/Confirmation'
+import SuiviReservation from '../pages/public/SuiviReservation'
+import RecuReservation from '../pages/public/RecuReservation'
 import Remboursement from '../pages/public/Remboursement'
 import Connexion from '../pages/public/Connexion'
+import Inscription from '../pages/public/Inscription'
 import InscriptionHotelier from '../pages/public/InscriptionHotelier'
 import AboutPage from '../pages/public/AboutPage'
 import ContactPage from '../pages/public/ContactPage'
@@ -50,8 +53,11 @@ export default function AppRouter() {
         <Route path="/reservation/:id" element={<Reservation />} />
         <Route path="/paiement" element={<Paiement />} />
         <Route path="/confirmation/:reservationId" element={<Confirmation />} />
+        <Route path="/suivi-reservation" element={<SuiviReservation />} />
+        <Route path="/recu/:code" element={<RecuReservation />} />
         <Route path="/remboursement" element={<Remboursement />} />
         <Route path="/connexion" element={<Connexion />} />
+        <Route path="/inscription" element={<Inscription />} />
         <Route path="/inscription-hotelier" element={<InscriptionHotelier />} />
         <Route path="/a-propos" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />

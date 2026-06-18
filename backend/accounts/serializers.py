@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 from django.contrib.auth.password_validation import validate_password
 from .models import CustomUser, MessageContact
 
@@ -6,21 +7,29 @@ from .models import CustomUser, MessageContact
 class InscriptionSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, validators=[validate_password])
     password2 = serializers.CharField(write_only=True)
+    email = serializers.EmailField(validators=[
+        UniqueValidator(queryset=CustomUser.objects.all(), message="Un compte existe déjà avec cet email.")
+    ])
 
     class Meta:
         model = CustomUser
         fields = ('username', 'email', 'first_name', 'last_name', 'password', 'password2',
                   'role', 'telephone')
         extra_kwargs = {
-            'email': {'required': True},
             'telephone': {'required': False, 'allow_blank': True},
         }
 
     def validate(self, attrs):
+        import re
         if attrs['password'] != attrs.pop('password2'):
             raise serializers.ValidationError({"password": "Les mots de passe ne correspondent pas."})
         if attrs.get('role') == 'admin':
             raise serializers.ValidationError({"role": "Vous ne pouvez pas créer un compte administrateur."})
+        nom_regex = re.compile(r"^[a-zA-ZÀ-ÿ\s\-']+$")
+        if attrs.get('first_name') and not nom_regex.match(attrs['first_name'].strip()):
+            raise serializers.ValidationError({"first_name": "Le prénom ne doit contenir que des lettres."})
+        if attrs.get('last_name') and not nom_regex.match(attrs['last_name'].strip()):
+            raise serializers.ValidationError({"last_name": "Le nom ne doit contenir que des lettres."})
         return attrs
 
     def create(self, validated_data):

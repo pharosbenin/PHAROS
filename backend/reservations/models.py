@@ -138,7 +138,7 @@ class Annulation(models.Model):
 
 
 class Modification(models.Model):
-    SENS = [('hausse', 'Hausse'), ('baisse', 'Baisse')]
+    SENS = [('hausse', 'Hausse'), ('baisse', 'Baisse'), ('neutre', 'Neutre')]
 
     reservation = models.ForeignKey(Reservation, on_delete=models.CASCADE, related_name='modifications')
     demandeur = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)

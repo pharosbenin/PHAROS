@@ -72,8 +72,8 @@ export default function Paiement() {
 
   const validerPaiement = async (e) => {
     e.preventDefault()
-    if (!telephone || telephone.length < 8) {
-      setErreur('Veuillez saisir un numéro valide (8 chiffres)')
+    if (!telephone || telephone.length !== 10 || !telephone.startsWith('01')) {
+      setErreur('Numéro invalide. 10 chiffres requis, commençant par 01.')
       return
     }
     if (!reservationNumero) {
@@ -116,7 +116,7 @@ export default function Paiement() {
 
   return (
     <Layout>
-      <div className="max-w-lg mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
 
         {etape === 'saisie' && (
           <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm mb-6">
@@ -174,8 +174,8 @@ export default function Paiement() {
                   <span className="text-gray-500 text-sm font-semibold">+229</span>
                   <div className="w-px h-5 bg-gray-200" />
                   <input type="tel" value={telephone}
-                    onChange={e => setTelephone(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                    placeholder="XXXXXXXX" className="flex-1 text-sm text-gray-800 outline-none" required />
+                    onChange={e => setTelephone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    placeholder="01XXXXXXXX" className="flex-1 text-sm text-gray-800 outline-none" required />
                 </div>
 
 {erreur && <p className="text-red-500 text-xs mt-2 mb-1">{erreur}</p>}

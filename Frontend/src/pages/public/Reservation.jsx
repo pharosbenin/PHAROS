@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams, Navigate } from 'react-router-dom'
-import { Trash2, Plus, Minus, ChevronLeft, User, Mail, Phone, AlertCircle, Building2, Info, Lock, Loader2 } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Trash2, Plus, Minus, ChevronLeft, User, Mail, Phone, AlertCircle, Building2, Info, Lock, Loader2, Eye, EyeOff, UserPlus, Calendar, X, CheckCircle, Star, Bell } from 'lucide-react'
 import Layout from '../../components/common/Layout'
 import api from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
@@ -14,7 +14,7 @@ function mediaUrl(path) {
 
 export default function Reservation() {
   const navigate = useNavigate()
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, login } = useAuth()
   const [searchParams] = useSearchParams()
   const hotelId = searchParams.get('hotelId') || '1'
   const chambreIdParam = searchParams.get('chambreId')
@@ -35,9 +35,35 @@ export default function Reservation() {
     telephone: user?.telephone || '',
   })
   const [erreurDates, setErreurDates] = useState('')
+  const [chambresDispoIds, setChambresDispoIds] = useState(null)
+  const [creerCompte, setCreerCompte] = useState(false)
+  const [motDePasse, setMotDePasse] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showInscriptionModal, setShowInscriptionModal] = useState(false)
+  const [compteTimer, setCompteTimer] = useState(12)
+  const inscriptionRef = useRef(null)
 
   useEffect(() => {
-    if (authLoading || !user || ['gestionnaire', 'admin'].includes(user.role)) return
+    if (!authLoading && !user) {
+      const t = setTimeout(() => setShowInscriptionModal(true), 800)
+      return () => clearTimeout(t)
+    }
+  }, [authLoading, user])
+
+  useEffect(() => {
+    if (!showInscriptionModal) return
+    setCompteTimer(12)
+    const interval = setInterval(() => {
+      setCompteTimer(v => {
+        if (v <= 1) { clearInterval(interval); setShowInscriptionModal(false); return 0 }
+        return v - 1
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [showInscriptionModal])
+
+  useEffect(() => {
+    if (authLoading || user?.role === 'gestionnaire' || user?.role === 'admin') return
     api.get(`/hotels/${hotelId}/`)
       .then(res => {
         const h = res.data
@@ -55,13 +81,21 @@ export default function Reservation() {
   }, [hotelId, user, authLoading])
 
   useEffect(() => {
-    if (chambreIdParam && hotel?.chambres?.length > 0) {
-      const chambre = hotel.chambres.find(c => String(c.id) === String(chambreIdParam))
-      if (chambre && chambre.dispo) {
-        setPanier([{ ...chambre, quantite: 1 }])
-      }
+    if (!dateArrivee || !dateDepart) return
+    api.get(`/hotels/${hotelId}/chambres/?date_arrivee=${dateArrivee}&date_depart=${dateDepart}`)
+      .then(res => setChambresDispoIds(new Set(res.data.map(c => c.id))))
+      .catch(() => setChambresDispoIds(null))
+  }, [hotelId, dateArrivee, dateDepart])
+
+  useEffect(() => {
+    if (!chambreIdParam || !hotel?.chambres?.length || panier.length > 0) return
+    const chambre = hotel.chambres.find(c => String(c.id) === String(chambreIdParam))
+    if (!chambre) return
+    const dispo = chambresDispoIds !== null ? chambresDispoIds.has(chambre.id) : chambre.dispo
+    if (dispo) {
+      setPanier([{ ...chambre, quantite: 1 }])
     }
-  }, [chambreIdParam, hotel])
+  }, [chambreIdParam, hotel, chambresDispoIds])
 
   const nuits = dateArrivee && dateDepart
     ? Math.max(0, Math.round((new Date(dateDepart) - new Date(dateArrivee)) / 86400000))
@@ -75,7 +109,12 @@ export default function Reservation() {
       return
     }
     setErreurDates('')
-    setPanier(prev => [...prev, chambre])
+    setPanier(prev => {
+      const nouveau = [...prev, chambre]
+      const maxCap = nouveau.reduce((sum, p) => sum + p.capacite, 0)
+      setVoyageurs(v => Math.min(v, maxCap))
+      return nouveau
+    })
   }
 
   const retirerChambre = (id) => {
@@ -96,10 +135,44 @@ export default function Reservation() {
     if (!dateArrivee || !dateDepart) { setErreurDates('Veuillez sélectionner vos dates.'); return }
     if (nuits === 0) { setErreurDates("La date de départ doit être après la date d'arrivée."); return }
     if (panier.length === 0) return
+    const tel = clientInfo.telephone.trim()
+    if (!tel || tel.length !== 10 || !tel.startsWith('01')) {
+      setErreurDates('Numéro de téléphone invalide. 10 chiffres requis, commençant par 01 (ex: 0197000000).')
+      return
+    }
+    if (creerCompte && motDePasse.length < 8) {
+      setErreurDates('Le mot de passe doit contenir au moins 8 caractères.')
+      return
+    }
 
     setEnvoi(true)
     setErreurDates('')
     try {
+      // Inscription si demandée
+      if (creerCompte && !user) {
+        try {
+          const resInscription = await api.post('/auth/inscription/', {
+            username: clientInfo.email,
+            email: clientInfo.email,
+            first_name: clientInfo.prenom,
+            last_name: clientInfo.nom,
+            telephone: clientInfo.telephone ? `+229${clientInfo.telephone}` : '',
+            password: motDePasse,
+            password2: motDePasse,
+            role: 'client',
+          })
+          const { tokens, user: newUser } = resInscription.data
+          localStorage.setItem('pharos_refresh', tokens.refresh)
+          login(newUser, tokens.access)
+        } catch (err) {
+          const data = err.response?.data
+          const msgs = data ? Object.values(data).flat() : []
+          setErreurDates(msgs[0] || "Erreur lors de la création du compte.")
+          setEnvoi(false)
+          return
+        }
+      }
+
       const chambre = panier[0]
       const res = await api.post('/reservations/', {
         hotel: parseInt(hotelId),
@@ -153,9 +226,7 @@ export default function Reservation() {
     )
   }
 
-  if (!user) return <Navigate to="/connexion" replace state={{ redirect: window.location.pathname + window.location.search }} />
-
-  if (['gestionnaire', 'admin'].includes(user.role)) {
+  if (user && ['gestionnaire', 'admin'].includes(user.role)) {
     return (
       <Layout>
         <div className="max-w-md mx-auto px-4 py-24 text-center">
@@ -196,7 +267,62 @@ export default function Reservation() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Popup inscription pour invités */}
+      {showInscriptionModal && !user && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative animate-fade-in">
+            <button onClick={() => setShowInscriptionModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors">
+              <X size={18} />
+            </button>
+
+            <div className="flex items-center justify-center w-14 h-14 bg-blue-100 rounded-full mx-auto mb-4">
+              <Bell size={26} className="text-blue-600" />
+            </div>
+
+            <h2 className="text-lg font-bold text-gray-900 text-center mb-1">Créez votre compte PHAROS</h2>
+            <p className="text-xs text-gray-400 text-center mb-5">Rejoignez-nous pour une meilleure expérience</p>
+
+            <div className="space-y-3 mb-6">
+              {[
+                { icon: CheckCircle, text: 'Suivez toutes vos réservations en temps réel' },
+                { icon: Star, text: 'Modifiez ou annulez en ligne à tout moment' },
+                { icon: Lock, text: 'Vos informations sauvegardées en toute sécurité' },
+              ].map(({ icon: Icon, text }, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className="flex items-center justify-center w-6 h-6 bg-blue-600 text-white rounded-full text-xs font-bold shrink-0 mt-0.5">
+                    {i + 1}
+                  </div>
+                  <p className="text-sm text-gray-700">{text}</p>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => {
+                setShowInscriptionModal(false)
+                setCreerCompte(true)
+                setTimeout(() => inscriptionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100)
+              }}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl text-sm transition-colors mb-2"
+            >
+              S'inscrire maintenant
+            </button>
+            <button
+              onClick={() => setShowInscriptionModal(false)}
+              className="w-full text-gray-500 hover:text-gray-700 text-sm py-1.5 transition-colors"
+            >
+              Continuer sans compte
+            </button>
+
+            <p className="text-xs text-gray-300 text-center mt-3">
+              Fermeture automatique dans {compteTimer}s
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm mb-6">
           <ChevronLeft size={18} />
           Retour à l'établissement
@@ -213,16 +339,18 @@ export default function Reservation() {
               <h2 className="font-semibold text-gray-900 mb-4">Dates du séjour</h2>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-gray-400 font-medium block mb-1">Arrivée *</label>
-                  <input type="date" value={dateArrivee} onChange={e => { setDateArrivee(e.target.value); setErreurDates('') }}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400" />
+                  <label className="text-xs text-gray-400 font-medium block mb-1">Arrivée</label>
+                  <div className="w-full border border-gray-100 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-800 flex items-center gap-2">
+                    <Calendar size={14} className="text-gray-400 shrink-0" />
+                    {dateArrivee ? new Date(dateArrivee + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+                  </div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 font-medium block mb-1">Départ *</label>
-                  <input type="date" value={dateDepart} onChange={e => { setDateDepart(e.target.value); setErreurDates('') }}
-                    min={dateArrivee || new Date().toISOString().split('T')[0]}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 outline-none focus:border-blue-400" />
+                  <label className="text-xs text-gray-400 font-medium block mb-1">Départ</label>
+                  <div className="w-full border border-gray-100 bg-gray-50 rounded-lg px-3 py-2 text-sm text-gray-800 flex items-center gap-2">
+                    <Calendar size={14} className="text-gray-400 shrink-0" />
+                    {dateDepart ? new Date(dateDepart + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+                  </div>
                 </div>
               </div>
               {nuits > 0 && (
@@ -267,9 +395,10 @@ export default function Reservation() {
               ) : (
                 <div className="space-y-3">
                   {chambres.map(chambre => {
+                    const estDispo = chambresDispoIds !== null ? chambresDispoIds.has(chambre.id) : chambre.dispo
                     const inPanier = panier.find(p => p.id === chambre.id)
                     return (
-                      <div key={chambre.id} className={`flex items-center justify-between p-4 rounded-xl border ${!chambre.dispo ? 'border-gray-100 opacity-50' : inPanier ? 'border-blue-200 bg-blue-50' : 'border-gray-100 hover:border-gray-200'} transition-colors`}>
+                      <div key={chambre.id} className={`flex items-center justify-between p-4 rounded-xl border ${!estDispo ? 'border-gray-100 opacity-50' : inPanier ? 'border-blue-200 bg-blue-50' : 'border-gray-100 hover:border-gray-200'} transition-colors`}>
                         <div className="flex items-center gap-3 flex-1">
                           {chambre.photo && (
                             <img src={chambre.photo} alt={chambre.type} className="w-16 h-12 object-cover rounded-lg shrink-0" />
@@ -284,7 +413,7 @@ export default function Reservation() {
                           </div>
                         </div>
                         <div>
-                          {!chambre.dispo ? (
+                          {!estDispo ? (
                             <span className="text-xs text-red-500 font-medium">Non disponible</span>
                           ) : inPanier ? (
                             <button onClick={() => retirerChambre(chambre.id)}
@@ -334,15 +463,69 @@ export default function Reservation() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 font-medium block mb-1">Téléphone</label>
+                  <label className="text-xs text-gray-400 font-medium block mb-1">Téléphone <span className="text-red-400">*</span></label>
                   <div className="relative">
                     <Phone size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input type="tel" value={clientInfo.telephone} onChange={e => setClientInfo(p => ({ ...p, telephone: e.target.value }))}
-                      placeholder="+229 XX XX XX XX"
+                    <input type="tel" value={clientInfo.telephone} onChange={e => { setClientInfo(p => ({ ...p, telephone: e.target.value.replace(/\D/g, '').slice(0, 10) })); setErreurDates('') }}
+                      placeholder="01XXXXXXXX"
                       className="w-full border border-gray-200 rounded-lg pl-9 pr-3 py-2 text-sm outline-none focus:border-blue-400" />
                   </div>
                 </div>
               </div>
+
+              {/* Case à cocher inscription */}
+              {!user && (
+                <div ref={inscriptionRef} className="mt-4 pt-4 border-t border-gray-100">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${creerCompte ? 'bg-blue-600 border-blue-600' : 'border-gray-300 group-hover:border-blue-400'}`}
+                      onClick={() => { setCreerCompte(v => !v); setMotDePasse('') }}>
+                      {creerCompte && <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3"><path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                    </div>
+                    <div onClick={() => { setCreerCompte(v => !v); setMotDePasse('') }}>
+                      <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                        <UserPlus size={14} className="text-blue-600" /> Créer un compte PHAROS
+                      </p>
+                      <p className="text-xs text-gray-400 mt-0.5">Suivez vos réservations, modifiez ou annulez en ligne</p>
+                    </div>
+                  </label>
+
+                  {creerCompte && (
+                    <div className="mt-4 space-y-3">
+                      <div>
+                        <label className="text-xs text-gray-400 font-medium block mb-1">Mot de passe <span className="text-red-400">*</span></label>
+                        <div className="relative">
+                          <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            value={motDePasse}
+                            onChange={e => setMotDePasse(e.target.value)}
+                            placeholder="Minimum 8 caractères"
+                            className="w-full border border-gray-200 rounded-lg pl-9 pr-10 py-2 text-sm outline-none focus:border-blue-400"
+                          />
+                          <button type="button" onClick={() => setShowPassword(v => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                            {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
+                        {motDePasse && (
+                          <div className="flex gap-1 mt-1.5">
+                            {[...Array(4)].map((_, i) => (
+                              <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${
+                                motDePasse.length >= (i + 1) * 2
+                                  ? motDePasse.length >= 8 ? 'bg-green-400' : 'bg-amber-400'
+                                  : 'bg-gray-200'
+                              }`} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-400">
+                        En cochant cette case, vous acceptez les <span className="text-blue-600 cursor-pointer hover:underline">conditions d'utilisation</span> de PHAROS BÉNIN.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

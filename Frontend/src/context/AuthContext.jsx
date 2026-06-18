@@ -10,9 +10,9 @@ function normaliserUtilisateur(data) {
     prenom: data.prenom ?? data.first_name ?? '',
     nom: data.nom ?? data.last_name ?? '',
     nom_complet: data.nom_complet
-      ?? ((data.first_name || data.prenom || '') + ' ' + (data.last_name || data.nom || '')).trim()
-      || data.username
-      || '',
+      ?? (((data.first_name || data.prenom || '') + ' ' + (data.last_name || data.nom || '')).trim()
+        || data.username
+        || ''),
   }
 }
 
@@ -31,6 +31,31 @@ export function AuthProvider({ children }) {
       }
     }
     setLoading(false)
+  }, [])
+
+  // Synchronise la session entre onglets : si un autre onglet du même navigateur
+  // se connecte/déconnecte (localStorage partagé), cet onglet doit refléter le
+  // même compte au lieu de continuer avec un nom affiché périmé.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key !== 'pharos_token' && e.key !== 'pharos_user') return
+      const newToken = localStorage.getItem('pharos_token')
+      const newUserRaw = localStorage.getItem('pharos_user')
+      if (!newToken || !newUserRaw) {
+        setUser(null)
+        setToken(null)
+        return
+      }
+      try {
+        setUser(normaliserUtilisateur(JSON.parse(newUserRaw)))
+        setToken(newToken)
+      } catch {
+        setUser(null)
+        setToken(null)
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
   }, [])
 
   const login = (userData, accessToken) => {

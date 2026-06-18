@@ -49,7 +49,7 @@ export default function Navbar() {
               <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#F57C2B] group-hover:w-full transition-all duration-300" />
             </Link>
             {!user && (
-              <Link to="/connexion?type=hotelier" className="text-black hover:text-[#F57C2B] text-[14px] font-extrabold tracking-wide transition-colors relative group">
+              <Link to="/inscription-hotelier" className="text-black hover:text-[#F57C2B] text-[14px] font-extrabold tracking-wide transition-colors relative group">
                 Espace hôtelier
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#F57C2B] group-hover:w-full transition-all duration-300" />
               </Link>
@@ -107,7 +107,7 @@ export default function Navbar() {
                   Se connecter
                 </Link>
                 <Link
-                  to="/connexion?type=hotelier"
+                  to="/inscription-hotelier"
                   className="bg-blue-600 hover:bg-[#F57C2B] text-white text-[14px] font-extrabold px-4 py-2 rounded-lg transition-colors"
                 >
                   <span className="hidden sm:inline">Inscrire mon hôtel</span>
@@ -146,7 +146,7 @@ export default function Navbar() {
                 <Link to="/connexion" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-black hover:text-[#F57C2B] hover:bg-orange-50 rounded-lg transition-colors">
                   Se connecter
                 </Link>
-                <Link to="/connexion?type=hotelier" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-blue-600 hover:text-[#F57C2B] font-medium hover:bg-orange-50 rounded-lg transition-colors">
+                <Link to="/inscription-hotelier" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-blue-600 hover:text-[#F57C2B] font-medium hover:bg-orange-50 rounded-lg transition-colors">
                   Inscrire mon hôtel
                 </Link>
               </>

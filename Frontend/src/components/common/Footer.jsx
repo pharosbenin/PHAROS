@@ -31,7 +31,8 @@ export default function Footer() {
               <li><Link to="/" className="text-sm hover:text-white transition-colors">Accueil</Link></li>
               <li><Link to="/recherche" className="text-sm hover:text-white transition-colors">Rechercher un hôtel</Link></li>
               <li><Link to="/connexion" className="text-sm hover:text-white transition-colors">Se connecter</Link></li>
-              <li><Link to="/connexion?type=hotelier" className="text-sm hover:text-white transition-colors">Inscrire mon hôtel</Link></li>
+              <li><Link to="/suivi-reservation" className="text-sm hover:text-white transition-colors">Gérer ma réservation</Link></li>
+              <li><Link to="/inscription-hotelier" className="text-sm hover:text-white transition-colors">Inscrire mon hôtel</Link></li>
               <li><Link to="/regles" className="text-sm text-[#F57C2B] hover:text-orange-400 transition-colors font-medium">Règles de la plateforme</Link></li>
             </ul>
           </div>

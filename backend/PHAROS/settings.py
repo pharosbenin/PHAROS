@@ -38,6 +38,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'PHAROS.middleware.NoCacheAPIMiddleware',
 ]
 
 ROOT_URLCONF = 'PHAROS.urls'
@@ -111,6 +112,17 @@ else:
     ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'authorization',
+    'content-type',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+    'cache-control',
+    'pragma',
+]
 
 AUTH_USER_MODEL = 'accounts.CustomUser'
 

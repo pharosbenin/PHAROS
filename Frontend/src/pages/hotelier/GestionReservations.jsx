@@ -91,6 +91,7 @@ export default function GestionReservations() {
   const taux = hotel?.type_abonnement === 'pro' ? 5 : 3
 
   const reservationsFiltrees = reservations
+    .filter(r => r.statut !== 'en_attente')
     .filter(r => filtreStatut === 'tous' || r.statut === filtreStatut)
     .filter(r => {
       if (!recherche) return true
