@@ -38,7 +38,7 @@ function NoteBadge({ note }) {
   )
 }
 
-export default function CarteHotel({ hotel, vue = 'grille' }) {
+export default function CarteHotel({ hotel, vue = 'grille', estBooste = false }) {
   const {
     id, nom, localisation, ville, prix_min, prix_min_original, a_promotion,
     note_moyenne, nb_avis, abonnement, equipements = [], etoiles, photo_principale
@@ -54,7 +54,11 @@ export default function CarteHotel({ hotel, vue = 'grille' }) {
         <div className="relative w-56 shrink-0 overflow-hidden">
           <img src={photo} alt={nom} className="w-full h-full min-h-[160px] object-cover group-hover:scale-105 transition-transform duration-500" />
           <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          {abonnement === 'pro' && (
+          {estBooste ? (
+            <span className="absolute top-3 left-3 bg-amber-500 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-md">
+              ⭐ En vedette
+            </span>
+          ) : abonnement === 'pro' && (
             <span className="absolute top-3 left-3 bg-[#F57C2B] text-white text-xs font-black px-2.5 py-1 rounded-full shadow-md">
               Pro
             </span>
@@ -116,7 +120,11 @@ export default function CarteHotel({ hotel, vue = 'grille' }) {
         {/* Top accent bar */}
         <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-[#F57C2B] to-orange-400 scale-x-0 group-hover:scale-x-100 transition-transform duration-400 origin-left" />
 
-        {abonnement === 'pro' && (
+        {estBooste ? (
+          <span className="absolute top-3 left-3 bg-amber-500 text-white text-xs font-black px-3 py-1 rounded-full shadow-lg">
+            ⭐ En vedette
+          </span>
+        ) : abonnement === 'pro' && (
           <span className="absolute top-3 left-3 bg-[#F57C2B] text-white text-xs font-black px-3 py-1 rounded-full shadow-lg">
             Partenaire certifié
           </span>

@@ -45,6 +45,7 @@ export default function Resultats() {
   const [filtresOuverts, setFiltresOuverts] = useState(false)
   const [filtres, setFiltres] = useState({ equipements: [], type: '', etoilesMin: 0, restauration: false, prixMax: 0, nbPersonnes: 0 })
   const [hotels, setHotels] = useState([])
+  const [evenements, setEvenements] = useState([])
   const [chargement, setChargement] = useState(true)
 
   const chargerHotels = () => {
@@ -75,6 +76,13 @@ export default function Resultats() {
   }
 
   useEffect(() => { chargerHotels() }, [ville, tri])
+
+  useEffect(() => {
+    if (!ville) { setEvenements([]); return }
+    api.get('/evenements/', { params: { ville } })
+      .then(res => setEvenements(res.data.filter(e => e.est_en_cours)))
+      .catch(() => setEvenements([]))
+  }, [ville])
 
   const hotelsFiltres = hotels.filter(h => {
     if (filtres.type && h.type_etablissement !== filtres.type) return false
@@ -310,6 +318,25 @@ export default function Resultats() {
               </div>
             )}
 
+            {/* Bandeau événement en cours */}
+            {evenements.length > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-2xl px-5 py-4 mb-5 flex items-start gap-3">
+                <div>
+                  <p className="font-bold text-orange-700 text-sm">
+                    {evenements.map(e => e.nom).join(' · ')}
+                  </p>
+                  <p className="text-xs text-orange-500 mt-0.5">
+                    Événement en cours à {ville} — les hôtels partenaires certifiés sont mis en avant pendant cette période.
+                  </p>
+                  {evenements[0] && (
+                    <p className="text-xs text-orange-400 mt-0.5">
+                      Du {new Date(evenements[0].date_debut).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })} au {new Date(evenements[0].date_fin).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {chargement ? (
               <div className="bg-white rounded-2xl p-12 text-center border border-gray-100">
                 <Loader2 size={40} className="text-blue-500 mx-auto mb-3 animate-spin" />
@@ -331,7 +358,7 @@ export default function Resultats() {
                 : 'space-y-4'
               }>
                 {hotelsFiltres.map(hotel => (
-                  <CarteHotel key={hotel.id} hotel={hotel} vue={vueGrille ? 'grille' : 'liste'} />
+                  <CarteHotel key={hotel.id} hotel={hotel} vue={vueGrille ? 'grille' : 'liste'} estBooste={hotel.est_booste || false} />
                 ))}
               </div>
             )}

@@ -39,6 +39,7 @@ class RechercheHotels(generics.ListAPIView):
         today = timezone.now().date()
         boost_actif = MiseEnAvantHotel.objects.filter(
             hotel=OuterRef('pk'),
+            hotel__type_abonnement='pro',
             est_actif=True,
             date_boost_debut__lte=today,
             date_boost_fin__gte=today,

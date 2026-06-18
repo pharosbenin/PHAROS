@@ -121,7 +121,7 @@ function normaliserHotel(h) {
     occupation: c.occupation_actuelle || null,
     photo: mediaUrl(c.photos?.[0]?.image),
   }))
-  const equipements = [...new Set(chambres.flatMap(c => c.equipements || []))]
+  const equipements = [...new Set([...(h.equipements || []), ...chambres.flatMap(c => c.equipements || [])])]
   const photosSet = new Set()
   if (h.photos && h.photos.length > 0) {
     h.photos.forEach(p => { if (p.image) photosSet.add(mediaUrl(p.image)) })

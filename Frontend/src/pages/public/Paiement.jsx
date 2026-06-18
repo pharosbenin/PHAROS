@@ -11,9 +11,9 @@ const METHODES = [
     couleur: 'bg-yellow-400',
     textColor: 'text-yellow-900',
     logo: 'MTN',
-    testNum: '61234567',
     iconBg: 'bg-yellow-50 border-yellow-200',
     selectedBg: 'border-yellow-500 bg-yellow-50',
+    type: 'mobile',
   },
   {
     id: 'moov',
@@ -21,9 +21,29 @@ const METHODES = [
     couleur: 'bg-blue-600',
     textColor: 'text-white',
     logo: 'MOOV',
-    testNum: '96543210',
     iconBg: 'bg-blue-50 border-blue-200',
     selectedBg: 'border-blue-500 bg-blue-50',
+    type: 'mobile',
+  },
+  {
+    id: 'celtiis',
+    label: 'Celtiis Money',
+    couleur: 'bg-green-600',
+    textColor: 'text-white',
+    logo: 'CEL',
+    iconBg: 'bg-green-50 border-green-200',
+    selectedBg: 'border-green-500 bg-green-50',
+    type: 'mobile',
+  },
+  {
+    id: 'carte',
+    label: 'Carte bancaire',
+    couleur: 'bg-gray-800',
+    textColor: 'text-white',
+    logo: '💳',
+    iconBg: 'bg-gray-50 border-gray-200',
+    selectedBg: 'border-gray-500 bg-gray-50',
+    type: 'carte',
   },
 ]
 
@@ -32,6 +52,7 @@ export default function Paiement() {
   const { state } = useLocation()
   const [methode, setMethode] = useState('mtn')
   const [telephone, setTelephone] = useState('')
+  const [carte, setCarte] = useState({ numero: '', expiry: '', cvv: '', titulaire: '' })
   const [etape, setEtape] = useState('saisie') // saisie | attente | succes
   const [erreur, setErreur] = useState('')
   const [transactionId, setTransactionId] = useState('')
@@ -55,6 +76,7 @@ export default function Paiement() {
   const commission = Math.round(total * taux / 100)
   const escrow = total - commission
   const methodeActive = METHODES.find(m => m.id === methode)
+  const estCarte = methodeActive?.type === 'carte'
 
   // Compte à rebours sur l'écran d'attente
   useEffect(() => {
@@ -72,24 +94,32 @@ export default function Paiement() {
 
   const validerPaiement = async (e) => {
     e.preventDefault()
-    if (!telephone || telephone.length !== 10 || !telephone.startsWith('01')) {
-      setErreur('Numéro invalide. 10 chiffres requis, commençant par 01.')
-      return
-    }
     if (!reservationNumero) {
       setErreur('Numéro de réservation manquant. Recommencez la réservation.')
       return
+    }
+    if (estCarte) {
+      const num = carte.numero.replace(/\s/g, '')
+      if (num.length !== 16) { setErreur('Numéro de carte invalide (16 chiffres requis).'); return }
+      if (!carte.expiry.match(/^\d{2}\/\d{2}$/)) { setErreur('Date d\'expiration invalide (MM/AA).'); return }
+      if (carte.cvv.length !== 3) { setErreur('CVV invalide (3 chiffres requis).'); return }
+      if (!carte.titulaire.trim()) { setErreur('Nom du titulaire requis.'); return }
+    } else {
+      if (!telephone || telephone.length !== 10 || !telephone.startsWith('01')) {
+        setErreur('Numéro invalide. 10 chiffres requis, commençant par 01.')
+        return
+      }
     }
 
     setErreur('')
     setEtape('attente')
 
     try {
+      const payload = estCarte
+        ? { methode, numero_telephone: '' }
+        : { methode, numero_telephone: `+229${telephone}` }
       const [res] = await Promise.all([
-        api.post(`/reservations/${reservationNumero}/paiement/`, {
-          methode,
-          numero_telephone: `+229${telephone}`,
-        }),
+        api.post(`/reservations/${reservationNumero}/paiement/`, payload),
         new Promise(resolve => setTimeout(resolve, 4000)),
       ])
       setTransactionId(res.data.transaction_id || 'FDP-' + Math.random().toString(36).substring(2, 10).toUpperCase())
@@ -148,11 +178,11 @@ export default function Paiement() {
             <div className="p-5">
               <form onSubmit={validerPaiement}>
 
-                {/* Opérateur */}
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Opérateur</p>
+                {/* Méthode de paiement */}
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Mode de paiement</p>
                 <div className="grid grid-cols-2 gap-3 mb-5">
                   {METHODES.map(m => (
-                    <button key={m.id} type="button" onClick={() => setMethode(m.id)}
+                    <button key={m.id} type="button" onClick={() => { setMethode(m.id); setErreur('') }}
                       className={`p-3.5 rounded-xl border-2 transition-all text-left ${methode === m.id ? m.selectedBg : 'border-gray-200 hover:border-gray-300 bg-white'}`}>
                       <div className={`w-9 h-9 ${m.couleur} rounded-lg flex items-center justify-center mb-2`}>
                         <span className={`text-xs font-black ${m.textColor}`}>{m.logo}</span>
@@ -168,21 +198,79 @@ export default function Paiement() {
                   ))}
                 </div>
 
-                {/* Téléphone */}
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Numéro de téléphone</p>
-                <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-3 focus-within:border-[#FF6B2B] transition-colors mb-2">
-                  <span className="text-gray-500 text-sm font-semibold">+229</span>
-                  <div className="w-px h-5 bg-gray-200" />
-                  <input type="tel" value={telephone}
-                    onChange={e => setTelephone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    placeholder="01XXXXXXXX" className="flex-1 text-sm text-gray-800 outline-none" required />
-                </div>
+                {/* Champs Mobile Money */}
+                {!estCarte && (
+                  <>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Numéro de téléphone</p>
+                    <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-3 focus-within:border-[#FF6B2B] transition-colors mb-2">
+                      <span className="text-gray-500 text-sm font-semibold">+229</span>
+                      <div className="w-px h-5 bg-gray-200" />
+                      <input type="tel" value={telephone}
+                        onChange={e => setTelephone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                        placeholder="01XXXXXXXX" className="flex-1 text-sm text-gray-800 outline-none" />
+                    </div>
+                    <p className="text-xs text-gray-400 mb-5">
+                      Vous recevrez une confirmation {methodeActive?.label} pour valider le paiement.
+                    </p>
+                  </>
+                )}
+
+                {/* Champs Carte bancaire */}
+                {estCarte && (
+                  <div className="space-y-3 mb-5">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Numéro de carte</p>
+                      <input
+                        type="text" inputMode="numeric"
+                        value={carte.numero}
+                        onChange={e => {
+                          const v = e.target.value.replace(/\D/g, '').slice(0, 16)
+                          setCarte(p => ({ ...p, numero: v.replace(/(.{4})/g, '$1 ').trim() }))
+                        }}
+                        placeholder="0000 0000 0000 0000"
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:border-[#FF6B2B] tracking-widest font-mono"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Expiration</p>
+                        <input
+                          type="text" inputMode="numeric"
+                          value={carte.expiry}
+                          onChange={e => {
+                            let v = e.target.value.replace(/\D/g, '').slice(0, 4)
+                            if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2)
+                            setCarte(p => ({ ...p, expiry: v }))
+                          }}
+                          placeholder="MM/AA"
+                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:border-[#FF6B2B] font-mono"
+                        />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">CVV</p>
+                        <input
+                          type="text" inputMode="numeric"
+                          value={carte.cvv}
+                          onChange={e => setCarte(p => ({ ...p, cvv: e.target.value.replace(/\D/g, '').slice(0, 3) }))}
+                          placeholder="123"
+                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:border-[#FF6B2B] font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Nom du titulaire</p>
+                      <input
+                        type="text"
+                        value={carte.titulaire}
+                        onChange={e => setCarte(p => ({ ...p, titulaire: e.target.value.toUpperCase() }))}
+                        placeholder="NOM PRÉNOM"
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:border-[#FF6B2B] uppercase"
+                      />
+                    </div>
+                  </div>
+                )}
 
 {erreur && <p className="text-red-500 text-xs mt-2 mb-1">{erreur}</p>}
-
-                <p className="text-xs text-gray-400 mb-5">
-                  Vous recevrez une confirmation {methodeActive?.label} pour valider le paiement.
-                </p>
 
                 <button type="submit"
                   className="w-full bg-[#FF6B2B] hover:bg-orange-600 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-colors">

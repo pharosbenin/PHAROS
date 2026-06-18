@@ -63,6 +63,7 @@ class Paiement(models.Model):
     METHODES = [
         ('mtn', 'MTN Mobile Money'),
         ('moov', 'Moov Money'),
+        ('celtiis', 'Celtiis Money'),
         ('carte', 'Carte bancaire'),
     ]
     STATUTS = [

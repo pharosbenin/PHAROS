@@ -328,7 +328,7 @@ export default function Accueil() {
             <div ref={scrollRefPro} className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 scroll-smooth scrollbar-hide">
               {hotelsPro.slice(0, 5).map(hotel => (
                 <div key={hotel.id} className="w-[280px] flex-shrink-0">
-                  <CarteHotel hotel={hotel} />
+                  <CarteHotel hotel={hotel} estBooste={hotel.est_booste || false} />
                 </div>
               ))}
             </div>
@@ -435,7 +435,7 @@ export default function Accueil() {
               <div ref={scrollRefRec} className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 scroll-smooth scrollbar-hide">
                 {hotelsRecommandes.map(hotel => (
                   <div key={hotel.id} className="w-[280px] flex-shrink-0">
-                    <CarteHotel hotel={hotel} />
+                    <CarteHotel hotel={hotel} estBooste={hotel.est_booste || false} />
                   </div>
                 ))}
               </div>

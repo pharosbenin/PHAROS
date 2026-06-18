@@ -131,6 +131,7 @@ class HotelListeSerializer(serializers.ModelSerializer):
         data['capacite_max'] = max(
             (c.capacite for c in instance.types_chambres.all()), default=0
         )
+        data['est_booste'] = getattr(instance, 'est_booste', False)
         return data
 
     class Meta:
