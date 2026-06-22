@@ -43,12 +43,12 @@ const SECTIONS = [
     couleur: 'text-green-600',
     fond: 'bg-green-50',
     bordure: 'border-green-200',
-    titre: 'Paiement & Mobile Money',
+    titre: 'Paiement & Règlement',
     regles: [
-      { ok: true,  texte: 'Les paiements s\'effectuent uniquement via les canaux officiels PHAROS (MTN Money, Moov Money).' },
-      { ok: true,  texte: 'Votre paiement est sécurisé et conservé jusqu\'à confirmation du séjour.' },
-      { ok: true,  texte: 'Un reçu numérique est envoyé automatiquement après chaque transaction.' },
-      { ok: true,  texte: 'Le remboursement est traité sous 48 h en cas d\'annulation dans les délais.' },
+      { ok: true,  texte: 'Les paiements s\'effectuent uniquement via les canaux officiels PHAROS (MTN Money, Moov Money, Celtiis Money, Carte bancaire).' },
+      { ok: true,  texte: 'Votre paiement est sécurisé et conservé en escrow jusqu\'à confirmation mutuelle du séjour.' },
+      { ok: true,  texte: 'Un reçu numérique et un QR Code de confirmation sont disponibles dans votre espace client après paiement.' },
+      { ok: true,  texte: 'Annulation dans les 2 h suivant le paiement : remboursement intégral. Au-delà, des frais selon la politique de l\'établissement s\'appliquent.' },
       { ok: false, texte: 'Aucun paiement direct à l\'hôtel avant l\'arrivée ne remplace la réservation PHAROS.' },
       { ok: false, texte: 'Les tentatives de contournement du système de paiement sont sanctionnées.' },
     ],
@@ -140,9 +140,9 @@ export default function ReglesPage() {
           </h2>
           <div className="grid sm:grid-cols-3 gap-4">
             {[
-              { delai: '48 h ou plus avant', action: 'Remboursement intégral', couleur: 'bg-green-500/15 border-green-500/30 text-green-300' },
-              { delai: '24 h à 48 h avant', action: 'Remboursement à 50 %', couleur: 'bg-amber-500/15 border-amber-500/30 text-amber-300' },
-              { delai: 'Moins de 24 h', action: 'Aucun remboursement', couleur: 'bg-red-500/15 border-red-500/30 text-red-300' },
+              { delai: 'Dans les 2 h après paiement', action: 'Remboursement intégral', couleur: 'bg-green-500/15 border-green-500/30 text-green-300' },
+              { delai: 'Après 2 h', action: 'Frais selon politique hôtel', couleur: 'bg-amber-500/15 border-amber-500/30 text-amber-300' },
+              { delai: 'Jour d\'arrivée ou après', action: 'Annulation impossible', couleur: 'bg-red-500/15 border-red-500/30 text-red-300' },
             ].map((item) => (
               <div key={item.delai} className={`border rounded-xl px-4 py-4 ${item.couleur}`}>
                 <p className="text-xs font-bold uppercase tracking-wider opacity-70 mb-1">{item.delai}</p>
@@ -151,7 +151,7 @@ export default function ReglesPage() {
             ))}
           </div>
           <p className="text-white/40 text-xs mt-4">
-            * Les cas de force majeure (maladie, urgence) sont étudiés individuellement par notre équipe.
+            * Le taux de frais d'annulation après 2 h est défini par chaque établissement. Les cas de force majeure sont étudiés individuellement.
           </p>
         </div>
 

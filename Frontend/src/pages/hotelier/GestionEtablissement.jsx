@@ -381,20 +381,25 @@ export default function GestionEtablissement() {
               <div className="bg-white rounded-2xl border border-gray-100 p-6">
                 <h2 className="font-bold text-gray-900 mb-5">Contacts</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Téléphone — lecture seule */}
+                  <div>
+                    <label className="text-xs text-gray-500 font-medium block mb-1.5">Téléphone</label>
+                    <div className="relative">
+                      <Phone size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input type="tel" value={form.telephone} readOnly
+                        className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm bg-gray-50 text-gray-500 cursor-not-allowed outline-none" />
+                    </div>
+                  </div>
                   {[
-                    { champ: 'telephone', label: 'Téléphone', icon: Phone, placeholder: '01XXXXXXXX', type: 'tel' },
-                    { champ: 'email', label: 'Email', icon: Mail, placeholder: 'contact@hotel.bj', type: 'email' },
-                    { champ: 'site_web', label: 'Site web', icon: Globe, placeholder: 'https://hotel.bj', type: 'text' },
+                    { champ: 'email', label: 'Email', icon: Mail, type: 'email' },
+                    { champ: 'site_web', label: 'Site web', icon: Globe, type: 'text' },
                   ].map(c => (
                     <div key={c.champ}>
                       <label className="text-xs text-gray-500 font-medium block mb-1.5">{c.label}</label>
                       <div className="relative">
                         <c.icon size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                        <input type={c.type} value={form[c.champ]}
-                          onChange={e => setChamp(c.champ, c.champ === 'telephone' ? e.target.value.replace(/\D/g, '').slice(0, 10) : e.target.value)}
-                          placeholder={c.placeholder}
-                          maxLength={c.champ === 'telephone' ? 10 : undefined}
-                          className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm outline-none focus:border-blue-400" />
+                        <input type={c.type} value={form[c.champ]} readOnly
+                          className="w-full border border-gray-200 rounded-xl pl-10 pr-4 py-3 text-sm bg-gray-50 text-gray-500 cursor-not-allowed outline-none" />
                       </div>
                     </div>
                   ))}

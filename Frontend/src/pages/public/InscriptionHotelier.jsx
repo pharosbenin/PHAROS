@@ -380,23 +380,41 @@ export default function InscriptionHotelier() {
     setChargement(true)
     setErreur('')
     try {
-      // 1. Créer le compte gestionnaire
-      const username = compte.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '') + '_' + Date.now().toString().slice(-4)
-      const { data: resInscription } = await api.post('/auth/inscription/', {
-        username,
-        email: compte.email,
-        first_name: compte.prenom,
-        last_name: compte.nom,
-        password: compte.password,
-        password2: compte.confirmPassword,
-        role: 'gestionnaire',
-        telephone: compte.telephone ? `+229${compte.telephone}` : '',
-      })
+      // 1. Créer le compte gestionnaire (ou récupérer le token si déjà créé)
+      let token
+      try {
+        const username = compte.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '') + '_' + Date.now().toString().slice(-4)
+        const { data: resInscription } = await api.post('/auth/inscription/', {
+          username,
+          email: compte.email,
+          first_name: compte.prenom,
+          last_name: compte.nom,
+          password: compte.password,
+          password2: compte.confirmPassword,
+          role: 'gestionnaire',
+          telephone: compte.telephone ? `+229${compte.telephone}` : '',
+        })
+        token = resInscription.tokens.access
+        console.log('[Inscription] Compte créé, token obtenu.')
+      } catch (inscErr) {
+        const errData = inscErr.response?.data
+        console.error('[Inscription] Erreur:', inscErr.response?.status, errData || inscErr.message)
+        const emailExiste = errData?.email?.some(m => m.toLowerCase().includes('existe'))
+          || JSON.stringify(errData || '').toLowerCase().includes('existe')
+        if (!emailExiste) throw inscErr
+        // Le compte existe déjà → on se connecte pour récupérer le token
+        console.log('[Inscription] Email déjà existant, tentative de connexion...')
+        const { data: resLogin } = await api.post('/auth/connexion/', {
+          username: compte.email,
+          password: compte.password,
+        })
+        token = resLogin.access
+        console.log('[Connexion] Token récupéré.')
+      }
 
-      const token = resInscription.tokens.access
       const authHeader = { Authorization: `Bearer ${token}` }
 
-      // 2. Créer l'hôtel
+      // 2. Créer l'hôtel — ne pas forcer Content-Type, axios gère FormData automatiquement
       const formHotel = new FormData()
       formHotel.append('nom', etab.nom)
       formHotel.append('description', etab.description)
@@ -404,27 +422,31 @@ export default function InscriptionHotelier() {
       formHotel.append('ville', etab.ville)
       if (etab.latitude) formHotel.append('latitude', etab.latitude)
       if (etab.longitude) formHotel.append('longitude', etab.longitude)
-      formHotel.append('taux_annulation', etab.tauxAnnulation)
-      formHotel.append('taux_modification', etab.tauxModification)
+      formHotel.append('taux_annulation', etab.tauxAnnulation || '20')
+      formHotel.append('taux_modification', etab.tauxModification || '10')
       if (photos[0]?.file) formHotel.append('photo_principale', photos[0].file)
       if (docs.registre) formHotel.append('document_registre', docs.registre)
+      if (docs.identite) formHotel.append('document_identite', docs.identite)
 
+      console.log('[Hôtel] Envoi de la création...')
       const { data: resHotel } = await api.post('/gestionnaire/hotels/', formHotel, {
-        headers: { ...authHeader, 'Content-Type': 'multipart/form-data' },
+        headers: { ...authHeader, 'Content-Type': undefined },
       })
+      console.log('[Hôtel] Créé avec succès, id:', resHotel.id)
 
       // 3. Uploader les photos supplémentaires
       for (let i = 1; i < photos.length; i++) {
         const formPhoto = new FormData()
         formPhoto.append('image', photos[i].file)
         await api.post(`/gestionnaire/hotels/${resHotel.id}/photos/`, formPhoto, {
-          headers: { ...authHeader, 'Content-Type': 'multipart/form-data' },
+          headers: { ...authHeader, 'Content-Type': undefined },
         })
       }
 
       sessionStorage.removeItem(STORAGE_KEY)
       setSoumis(true)
     } catch (err) {
+      console.error('[Soumission] Erreur complète:', err.response?.status, err.response?.data, err.message)
       const data = err.response?.data
       const status = err.response?.status
       if (data && typeof data === 'object') {

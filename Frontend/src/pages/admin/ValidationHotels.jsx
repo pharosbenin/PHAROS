@@ -177,7 +177,9 @@ export default function ValidationHotels() {
 
                   {/* Détails dépliants */}
                   {estOuvert && (
-                    <div className="border-t border-gray-50 px-5 py-4 bg-gray-50/50">
+                    <div className="border-t border-gray-50 px-5 py-4 bg-gray-50/50 space-y-5">
+
+                      {/* Ligne 1 : infos + documents */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
                         {/* Infos dossier */}
@@ -213,27 +215,68 @@ export default function ValidationHotels() {
 
                         {/* Documents */}
                         <div>
-                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Documents</p>
-                          {h.document_registre ? (
-                            <div className="flex items-center gap-2 text-sm text-green-700">
-                              <CheckCircle size={14} className="text-green-500 shrink-0" />
-                              <span>Document registre</span>
-                              <a
-                                href={h.document_registre?.startsWith('http') ? h.document_registre : `http://localhost:8000${h.document_registre}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="ml-auto text-xs text-blue-600 hover:underline flex items-center gap-1">
-                                <FileText size={11} /> Voir
-                              </a>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2 text-sm text-red-500">
-                              <XCircle size={14} className="text-red-400 shrink-0" />
-                              <span>Aucun document fourni</span>
-                            </div>
-                          )}
+                          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Documents légaux</p>
+                          <div className="space-y-2">
+                            {[
+                              { champ: h.document_registre, label: 'Registre de commerce' },
+                              { champ: h.document_identite, label: "Pièce d'identité" },
+                            ].map(({ champ, label }) => champ ? (
+                              <div key={label} className="flex items-center gap-2 text-sm text-green-700">
+                                <CheckCircle size={14} className="text-green-500 shrink-0" />
+                                <span>{label}</span>
+                                <a
+                                  href={champ.startsWith('http') ? champ : `http://localhost:8000${champ}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="ml-auto text-xs text-blue-600 hover:underline flex items-center gap-1">
+                                  <FileText size={11} /> Voir
+                                </a>
+                              </div>
+                            ) : (
+                              <div key={label} className="flex items-center gap-2 text-sm text-red-500">
+                                <XCircle size={14} className="text-red-400 shrink-0" />
+                                <span>{label} — non fourni</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                       </div>
+
+                      {/* Ligne 2 : galerie photos */}
+                      {(() => {
+                        const toutes = []
+                        if (h.photo_principale) toutes.push({ url: h.photo_principale, legende: 'Photo principale' })
+                        ;(h.photos || []).forEach((p, i) => toutes.push({ url: p.image, legende: p.legende || `Photo ${i + 2}` }))
+                        if (toutes.length === 0) return null
+                        return (
+                          <div>
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">
+                              Photos ({toutes.length})
+                            </p>
+                            <div className="flex flex-wrap gap-3">
+                              {toutes.map((p, i) => {
+                                const src = p.url.startsWith('http') ? p.url : `http://localhost:8000${p.url}`
+                                return (
+                                  <a key={i} href={src} target="_blank" rel="noopener noreferrer"
+                                    className="group relative w-24 h-24 rounded-xl overflow-hidden border border-gray-200 hover:border-blue-400 transition-colors shrink-0">
+                                    <img src={src} alt={p.legende} className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-end p-1">
+                                      <span className="text-white text-[10px] opacity-0 group-hover:opacity-100 transition-opacity leading-tight">
+                                        {p.legende}
+                                      </span>
+                                    </div>
+                                    {i === 0 && (
+                                      <span className="absolute top-1 left-1 bg-blue-600 text-white text-[9px] px-1 py-0.5 rounded font-medium">
+                                        Principale
+                                      </span>
+                                    )}
+                                  </a>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })()}
                     </div>
                   )}
                 </div>

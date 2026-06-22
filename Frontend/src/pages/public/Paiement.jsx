@@ -146,16 +146,19 @@ export default function Paiement() {
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+      <div className="min-h-screen bg-orange-100/70">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
 
         {etape === 'saisie' && (
-          <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-gray-500 hover:text-gray-700 text-sm mb-6">
+          <button onClick={() => navigate(-1)} className="flex items-center gap-2 bg-orange-600 hover:bg-blue-600 text-white font-semibold text-sm mb-6 px-4 py-2 rounded-xl transition-colors shadow-sm">
             <ChevronLeft size={18} /> Retour
           </button>
         )}
 
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr_2fr] gap-6 items-start">
+
         {/* En-tête FedaPay simulation */}
-        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-5 shadow-sm">
+        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
           <div className="bg-[#1A1A2E] px-5 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-[#FF6B2B] rounded-lg flex items-center justify-center">
@@ -180,20 +183,22 @@ export default function Paiement() {
 
                 {/* Méthode de paiement */}
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Mode de paiement</p>
-                <div className="grid grid-cols-2 gap-3 mb-5">
+                <div className="grid grid-cols-4 gap-2 mb-5">
                   {METHODES.map(m => (
                     <button key={m.id} type="button" onClick={() => { setMethode(m.id); setErreur('') }}
-                      className={`p-3.5 rounded-xl border-2 transition-all text-left ${methode === m.id ? m.selectedBg : 'border-gray-200 hover:border-gray-300 bg-white'}`}>
-                      <div className={`w-9 h-9 ${m.couleur} rounded-lg flex items-center justify-center mb-2`}>
-                        <span className={`text-xs font-black ${m.textColor}`}>{m.logo}</span>
+                      className={`px-3 py-2 rounded-lg border-2 transition-all duration-200 text-left flex flex-row items-center gap-2.5 shadow-md hover:shadow-xl hover:-translate-y-1 transform ${methode === m.id ? m.selectedBg + ' scale-[1.03]' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
+                      <div className={`w-6 h-6 ${m.couleur} rounded-md flex items-center justify-center shrink-0`}>
+                        <span className={`text-[10px] font-black ${m.textColor}`}>{m.logo}</span>
                       </div>
-                      <p className="font-semibold text-sm text-gray-800 leading-tight">{m.label}</p>
-                      {methode === m.id && (
-                        <div className="flex items-center gap-1 mt-1">
-                          <Check size={11} className="text-blue-600" />
-                          <span className="text-xs text-blue-600 font-medium">Sélectionné</span>
-                        </div>
-                      )}
+                      <div className="min-w-0">
+                        <p className="font-bold text-xs text-gray-800 leading-tight truncate">{m.label}</p>
+                        {methode === m.id && (
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <Check size={10} className="text-blue-600" />
+                            <span className="text-[10px] text-blue-600 font-semibold">Sélectionné</span>
+                          </div>
+                        )}
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -273,7 +278,7 @@ export default function Paiement() {
 {erreur && <p className="text-red-500 text-xs mt-2 mb-1">{erreur}</p>}
 
                 <button type="submit"
-                  className="w-full bg-[#FF6B2B] hover:bg-orange-600 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 transition-colors">
+                  className="w-full bg-[#FF6B2B] hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors">
                   Payer {total.toLocaleString()} FCFA
                 </button>
               </form>
@@ -329,7 +334,7 @@ export default function Paiement() {
 
         {/* Récapitulatif escrow */}
         {etape === 'saisie' && (
-          <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-5">
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 sticky top-24">
             <h2 className="font-semibold text-gray-900 mb-3 text-sm">Répartition des fonds</h2>
             <div className="space-y-2 text-sm">
               {(reservationData.panier || []).map((item, i) => (
@@ -364,6 +369,9 @@ export default function Paiement() {
           </div>
         )}
 
+        </div>{/* fin grid */}
+
+      </div>
       </div>
     </Layout>
   )

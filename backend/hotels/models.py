@@ -46,6 +46,7 @@ class Hotel(models.Model):
     longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     photo_principale = models.ImageField(upload_to='hotels/', null=True, blank=True)
     document_registre = models.FileField(upload_to='documents/', null=True, blank=True)
+    document_identite = models.FileField(upload_to='documents/', null=True, blank=True)
     motif_rejet = models.TextField(blank=True)
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)

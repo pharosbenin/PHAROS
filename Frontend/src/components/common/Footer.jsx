@@ -54,15 +54,15 @@ export default function Footer() {
             <ul className="space-y-3">
               <li className="flex items-start gap-2 text-sm">
                 <MapPin size={16} className="mt-0.5 shrink-0 text-blue-400" />
-                Cotonou, Bénin
+                Parakou, Bénin
               </li>
               <li className="flex items-center gap-2 text-sm">
                 <Phone size={16} className="shrink-0 text-blue-400" />
-                +229 XX XX XX XX
+                +229 01 64 61 38 61
               </li>
               <li className="flex items-center gap-2 text-sm">
                 <Mail size={16} className="shrink-0 text-blue-400" />
-                contact@pharosbenin.bj
+                shanelmahugnon@gmail.com
               </li>
             </ul>
           </div>

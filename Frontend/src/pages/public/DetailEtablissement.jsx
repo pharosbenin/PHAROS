@@ -674,23 +674,6 @@ export default function DetailEtablissement() {
                       Ouvrir dans Google Maps
                     </a>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                      {hotel.telephone && (
-                        <a href={`tel:${hotel.telephone}`} className="flex items-center gap-2 text-gray-600 hover:text-blue-600 bg-gray-50 rounded-lg px-3 py-2 transition-colors">
-                          <Phone size={15} className="text-blue-500" /> {hotel.telephone}
-                        </a>
-                      )}
-                      {hotel.email && (
-                        <a href={`mailto:${hotel.email}`} className="flex items-center gap-2 text-gray-600 hover:text-blue-600 bg-gray-50 rounded-lg px-3 py-2 transition-colors">
-                          <Mail size={15} className="text-blue-500" /> {hotel.email}
-                        </a>
-                      )}
-                      {hotel.site_web && (
-                        <a href={hotel.site_web.startsWith('http') ? hotel.site_web : `https://${hotel.site_web}`}
-                          target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-gray-600 hover:text-blue-600 bg-gray-50 rounded-lg px-3 py-2 transition-colors">
-                          <Globe size={15} className="text-blue-500" /> {hotel.site_web}
-                        </a>
-                      )}
                     </div>
                   </div>
                 </div>

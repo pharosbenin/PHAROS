@@ -172,7 +172,7 @@ class HotelCreerSerializer(serializers.ModelSerializer):
                   'telephone', 'email', 'site_web', 'latitude', 'longitude',
                   'type_etablissement', 'equipements',
                   'taux_annulation', 'taux_modification', 'delai_gratuit',
-                  'photo_principale', 'document_registre')
+                  'photo_principale', 'document_registre', 'document_identite')
         read_only_fields = ('id',)
 
     def create(self, validated_data):
@@ -226,6 +226,7 @@ class HotelAdminSerializer(serializers.ModelSerializer):
     gestionnaire_email = serializers.EmailField(source='gestionnaire.email', read_only=True)
     gestionnaire_nom = serializers.CharField(source='gestionnaire.nom_complet', read_only=True)
     gestionnaire_telephone = serializers.CharField(source='gestionnaire.telephone', read_only=True)
+    photos = PhotoHotelSerializer(many=True, read_only=True)
 
     class Meta:
         model = Hotel
@@ -233,5 +234,7 @@ class HotelAdminSerializer(serializers.ModelSerializer):
                   'telephone', 'email', 'statut', 'type_abonnement',
                   'note_moyenne', 'nombre_avis', 'gestionnaire_email',
                   'gestionnaire_nom', 'gestionnaire_telephone',
-                  'document_registre', 'motif_rejet', 'date_creation')
+                  'photo_principale', 'photos',
+                  'document_registre', 'document_identite',
+                  'motif_rejet', 'date_creation')
         read_only_fields = ('id', 'date_creation')
