@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Abonnement, Commission, DemandeUpgradePro
+from .models import Abonnement, Commission, DemandeUpgradePro, Retrait
 
 
 class AbonnementSerializer(serializers.ModelSerializer):
@@ -47,3 +47,32 @@ class DemandeUpgradeProSerializer(serializers.ModelSerializer):
             return None
         u = obj.traite_par
         return f"{u.first_name} {u.last_name}".strip() or u.email
+
+
+class RetraitSerializer(serializers.ModelSerializer):
+    methode_display = serializers.CharField(source='get_methode_display', read_only=True)
+    statut_display = serializers.CharField(source='get_statut_display', read_only=True)
+
+    class Meta:
+        model = Retrait
+        fields = ('id', 'montant', 'methode', 'methode_display', 'numero_telephone',
+                  'statut', 'statut_display', 'motif_rejet', 'date_demande', 'date_traitement')
+        read_only_fields = ('id', 'statut', 'motif_rejet', 'date_demande', 'date_traitement')
+
+
+class RetraitAdminSerializer(serializers.ModelSerializer):
+    hotel_nom = serializers.CharField(source='hotel.nom', read_only=True)
+    hotel_ville = serializers.CharField(source='hotel.ville', read_only=True)
+    gestionnaire_nom = serializers.SerializerMethodField()
+    methode_display = serializers.CharField(source='get_methode_display', read_only=True)
+    statut_display = serializers.CharField(source='get_statut_display', read_only=True)
+
+    class Meta:
+        model = Retrait
+        fields = ('id', 'hotel', 'hotel_nom', 'hotel_ville', 'gestionnaire_nom',
+                  'montant', 'methode', 'methode_display', 'numero_telephone',
+                  'statut', 'statut_display', 'motif_rejet', 'date_demande', 'date_traitement')
+
+    def get_gestionnaire_nom(self, obj):
+        u = obj.hotel.gestionnaire
+        return getattr(u, 'nom_complet', None) or f"{u.first_name} {u.last_name}".strip() or u.email

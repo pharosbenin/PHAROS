@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Search, MapPin, SlidersHorizontal, Grid3X3, List, X, Star, ChevronDown, Filter, Loader2 } from 'lucide-react'
+import { Search, MapPin, SlidersHorizontal, Grid3X3, List, X, Star, ChevronDown, Filter, Loader2, Navigation, Landmark, TreePine, Church, Sword } from 'lucide-react'
 import Layout from '../../components/common/Layout'
 import CarteHotel from '../../components/common/CarteHotel'
 import api from '../../services/api'
@@ -47,12 +47,22 @@ export default function Resultats() {
   const [hotels, setHotels] = useState([])
   const [evenements, setEvenements] = useState([])
   const [chargement, setChargement] = useState(true)
+  const [pointsInteret, setPointsInteret] = useState([])
+  const [pointActif, setPointActif] = useState(
+    searchParams.get('point_interet')
+      ? { id: searchParams.get('point_interet'), type: searchParams.get('type') }
+      : null
+  )
 
   const chargerHotels = () => {
     setChargement(true)
     const params = {}
     if (ville) params.ville = ville
     if (searchParams.get('q')) params.q = searchParams.get('q')
+    if (pointActif) {
+      params.point_interet = pointActif.id
+      params.type = pointActif.type
+    }
     api.get('/hotels/', { params })
       .then(res => {
         let data = res.data.map(h => ({
@@ -75,13 +85,20 @@ export default function Resultats() {
       .finally(() => setChargement(false))
   }
 
-  useEffect(() => { chargerHotels() }, [ville, tri])
+  useEffect(() => { chargerHotels() }, [ville, tri, pointActif])
 
   useEffect(() => {
     if (!ville) { setEvenements([]); return }
     api.get('/evenements/', { params: { ville } })
       .then(res => setEvenements(res.data.filter(e => e.est_en_cours)))
       .catch(() => setEvenements([]))
+  }, [ville])
+
+  useEffect(() => {
+    if (!ville) { setPointsInteret([]); return }
+    api.get(`/villes/${encodeURIComponent(ville)}/points-interet/`)
+      .then(res => setPointsInteret(res.data || []))
+      .catch(() => setPointsInteret([]))
   }, [ville])
 
   const hotelsFiltres = hotels.filter(h => {
@@ -109,6 +126,16 @@ export default function Resultats() {
   const nbFiltresActifs = filtres.equipements.length + (filtres.type ? 1 : 0) + (filtres.etoilesMin > 0 ? 1 : 0) + (filtres.restauration ? 1 : 0) + (filtres.prixMax > 0 ? 1 : 0) + (filtres.nbPersonnes > 0 ? 1 : 0)
 
   const reinitialiserFiltres = () => setFiltres({ equipements: [], type: '', etoilesMin: 0, restauration: false, prixMax: 0, nbPersonnes: 0 })
+
+  function iconeCategorie(categorie) {
+    switch (categorie) {
+      case 'historique': return <Sword size={14} />
+      case 'culturel': return <Landmark size={14} />
+      case 'religieux': return <Church size={14} />
+      case 'naturel': return <TreePine size={14} />
+      default: return <MapPin size={14} />
+    }
+  }
 
   const panneauFiltres = (
     <div className="space-y-6">
@@ -315,6 +342,46 @@ export default function Resultats() {
             {filtresOuverts && (
               <div className="lg:hidden bg-white rounded-2xl border border-gray-100 p-5 mb-5">
                 {panneauFiltres}
+              </div>
+            )}
+
+            {/* Points d'intérêt */}
+            {pointsInteret.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs text-gray-500 font-semibold uppercase tracking-wide mb-2">
+                  Points d'intérêt à {ville}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {pointsInteret.map(pt => (
+                    <button
+                      key={`${pt.type}-${pt.id}`}
+                      onClick={() => setPointActif(
+                        pointActif?.id === String(pt.id) && pointActif?.type === pt.type
+                          ? null
+                          : { id: String(pt.id), type: pt.type }
+                      )}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                        pointActif?.id === String(pt.id) && pointActif?.type === pt.type
+                          ? 'bg-[#0D1B40] text-white border-[#0D1B40]'
+                          : 'bg-white text-gray-700 border-gray-200 hover:border-[#F57C2B] hover:text-[#F57C2B]'
+                      }`}
+                    >
+                      {iconeCategorie(pt.categorie)}
+                      {pt.nom}
+                      {pt.type === 'evenement' && <span className="ml-1 text-[10px] bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full">Événement</span>}
+                      {pointActif?.id === String(pt.id) && pointActif?.type === pt.type && (
+                        <X size={12} className="ml-1" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {pointActif && (
+                  <p className="text-xs text-[#F57C2B] mt-1.5 flex items-center gap-1">
+                    <Navigation size={12} />
+                    Hôtels triés par distance à ce point
+                    <button onClick={() => setPointActif(null)} className="ml-2 underline text-gray-400 hover:text-gray-600">Réinitialiser</button>
+                  </p>
+                )}
               </div>
             )}
 

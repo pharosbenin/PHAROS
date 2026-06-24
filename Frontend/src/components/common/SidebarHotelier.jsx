@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard, Building2, BedDouble, UtensilsCrossed,
-  CalendarCheck, Star, CreditCard, LogOut, ChevronDown
+  CalendarCheck, Star, CreditCard, LogOut, ChevronDown, Wallet
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
@@ -17,6 +17,7 @@ const navItems = [
   { to: '/hotelier/reservations', icon: CalendarCheck, label: 'Réservations' },
   { to: '/hotelier/avis', icon: Star, label: 'Avis clients' },
   { to: '/hotelier/abonnements', icon: CreditCard, label: 'Abonnement' },
+  { to: '/hotelier/retraits', icon: Wallet, label: 'Retraits' },
 ]
 
 export default function SidebarHotelier() {

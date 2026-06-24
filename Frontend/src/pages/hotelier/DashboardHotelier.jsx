@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { TrendingUp, TrendingDown, Users, BedDouble, Star, CheckCircle, ChevronRight, Bell, Calendar, Loader } from 'lucide-react'
+import { TrendingUp, TrendingDown, Users, BedDouble, Star, CheckCircle, ChevronRight, Bell, Calendar, Loader, Shield, ArrowDownToLine } from 'lucide-react'
 import SidebarHotelier from '../../components/common/SidebarHotelier'
 import BanniereAttente from '../../components/common/BanniereAttente'
 import { useAuth } from '../../context/AuthContext'
@@ -26,7 +26,6 @@ const STATUT_CHAMBRE = {
 }
 
 const STATUTS_ACTIFS = ['payee', 'confirmee', 'en_cours', 'confirme_client', 'confirme_hotel']
-const STATUTS_REVENUS = [...STATUTS_ACTIFS, 'terminee']
 
 export default function DashboardHotelier() {
   const { user } = useAuth()
@@ -42,13 +41,13 @@ export default function DashboardHotelier() {
     if (!hotelActif) return
     try {
       const [resReservations, resAvis, resChambres] = await Promise.all([
-        api.get('/gestionnaire/reservations/'),
-        api.get('/gestionnaire/avis/'),
+        api.get(`/gestionnaire/reservations/?hotel_id=${hotelActif.id}`),
+        api.get(`/gestionnaire/avis/?hotel_id=${hotelActif.id}`),
         api.get(`/gestionnaire/hotels/${hotelActif.id}/chambres/`),
       ])
       setHotel(hotelActif)
-      setReservations(resReservations.data.filter(r => r.hotel_id === hotelActif.id))
-      setAvis(resAvis.data.filter(a => a.hotel === hotelActif.id || a.hotel_id === hotelActif.id))
+      setReservations(resReservations.data)
+      setAvis(resAvis.data)
       setChambres(resChambres.data)
     } catch (err) {
       console.error('Erreur chargement dashboard', err)
@@ -69,32 +68,77 @@ export default function DashboardHotelier() {
   // --- Calculs ---
   const maintenant = new Date()
   const todayStr = maintenant.toISOString().slice(0, 10)
-  const debutMois = new Date(maintenant.getFullYear(), maintenant.getMonth(), 1)
 
-  const revenusMois = reservations
-    .filter(r => STATUTS_REVENUS.includes(r.statut) && new Date(r.date_creation) >= debutMois)
-    .reduce((sum, r) => sum + parseFloat(r.prix_total || 0), 0)
+  const debutPeriode = periode === 'semaine'
+    ? new Date(maintenant.getFullYear(), maintenant.getMonth(), maintenant.getDate() - 6)
+    : periode === 'mois'
+    ? new Date(maintenant.getFullYear(), maintenant.getMonth(), 1)
+    : new Date(maintenant.getFullYear(), 0, 1)
+
+  const labelPeriode = periode === 'semaine' ? '7 derniers jours' : periode === 'mois' ? 'ce mois' : 'cette année'
+
+  // Revenus = séjours terminés dans la période (fonds libérés, reçus par l'hôtel)
+  const revenus = reservations
+    .filter(r => r.statut === 'terminee' && new Date(r.date_depart) >= debutPeriode)
+    .reduce((sum, r) => {
+      if (r.montant_hotel != null) return sum + r.montant_hotel
+      const brut = parseFloat(r.prix_total || 0)
+      const taux = r.commission_taux ?? 3
+      return sum + Math.round(brut * (1 - taux / 100))
+    }, 0)
 
   const reservationsActives = reservations.filter(r => STATUTS_ACTIFS.includes(r.statut)).length
 
-  const noteStr = hotel?.note_moyenne
-    ? parseFloat(hotel.note_moyenne).toFixed(1) + ' / 5'
-    : '– / 5'
+  // Fonds libérés = séjours terminés (confirmation des deux parties)
+  const escrowLibere = reservations
+    .filter(r => r.statut === 'terminee')
+    .reduce((sum, r) => {
+      if (r.montant_hotel != null) return sum + r.montant_hotel
+      const brut = parseFloat(r.prix_total || 0)
+      const commission = r.commission_taux ?? 3
+      return sum + Math.round(brut * (1 - commission / 100))
+    }, 0)
+  // Fonds en attente = séjours payés non encore terminés
+  const escrowEnAttente = reservations
+    .filter(r => STATUTS_ACTIFS.includes(r.statut))
+    .reduce((sum, r) => {
+      if (r.montant_hotel != null) return sum + r.montant_hotel
+      const brut = parseFloat(r.prix_total || 0)
+      const commission = r.commission_taux ?? 3
+      return sum + Math.round(brut * (1 - commission / 100))
+    }, 0)
 
+  // Note moyenne calculée depuis les avis chargés (uniquement cet hôtel)
+  const noteMoyenne = avis.length > 0
+    ? (avis.reduce((sum, a) => sum + a.note, 0) / avis.length).toFixed(1)
+    : null
+  const noteStr = noteMoyenne ? `${noteMoyenne} / 5` : '– / 5'
+  const nbAvis = avis.length
+
+  // Taux d'occupation sur la période : nuits occupées / (chambres × jours de la période)
   const totalChambres = chambres.reduce((sum, c) => sum + c.nombre_chambres, 0)
-  const occAujourdHui = reservations.filter(r =>
-    STATUTS_ACTIFS.includes(r.statut) && r.date_arrivee <= todayStr && r.date_depart > todayStr
-  ).length
-  const tauxOccupation = totalChambres > 0 ? Math.round((occAujourdHui / totalChambres) * 100) : 0
+  const nbJoursPeriode = Math.max(1, Math.round((maintenant - debutPeriode) / 86400000) + 1)
+  const nuitsOccupees = reservations
+    .filter(r => [...STATUTS_ACTIFS, 'terminee'].includes(r.statut))
+    .reduce((sum, r) => {
+      const arrivee = new Date(r.date_arrivee)
+      const depart = new Date(r.date_depart)
+      const debut = new Date(Math.max(arrivee, debutPeriode))
+      const fin = new Date(Math.min(depart, maintenant))
+      const nuits = Math.max(0, Math.round((fin - debut) / 86400000))
+      return sum + nuits
+    }, 0)
+  const tauxOccupation = totalChambres > 0 ? Math.min(100, Math.round((nuitsOccupees / (totalChambres * nbJoursPeriode)) * 100)) : 0
 
   const stats = [
-    { label: 'Revenus ce mois', valeur: revenusMois.toLocaleString('fr-FR') + ' FCFA', icon: TrendingUp, couleur: 'text-green-600', bg: 'bg-green-50' },
+    { label: `Revenus · ${labelPeriode}`, valeur: revenus.toLocaleString('fr-FR') + ' FCFA', icon: TrendingUp, couleur: 'text-green-600', bg: 'bg-green-50' },
     { label: 'Réservations actives', valeur: String(reservationsActives), icon: BedDouble, couleur: 'text-blue-600', bg: 'bg-blue-50' },
-    { label: "Taux d'occupation", valeur: tauxOccupation + '%', icon: Users, couleur: 'text-indigo-600', bg: 'bg-indigo-50' },
-    { label: 'Note moyenne', valeur: noteStr, icon: Star, couleur: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: `Taux d'occupation · ${labelPeriode}`, valeur: tauxOccupation + '%', icon: Users, couleur: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { label: `Note moyenne · ${nbAvis} avis`, valeur: noteStr, icon: Star, couleur: 'text-amber-600', bg: 'bg-amber-50' },
   ]
 
   const reservationsRecentes = [...reservations]
+    .filter(r => r.statut !== 'en_attente')
     .sort((a, b) => new Date(b.date_creation) - new Date(a.date_creation))
     .slice(0, 5)
 
@@ -187,6 +231,37 @@ export default function DashboardHotelier() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Bandeau Escrow */}
+        <div className="bg-white border border-gray-100 rounded-2xl px-5 py-4 mb-8 flex flex-col sm:flex-row sm:items-center gap-4 shadow-sm">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center shrink-0">
+              <Shield size={20} className="text-purple-600" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-900">Solde Escrow</p>
+              <p className="text-xs text-gray-400 mt-0.5">Fonds libérés après confirmation des deux parties</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-6 sm:gap-8">
+            <div className="text-right">
+              <p className="text-xl font-black text-purple-700">{escrowLibere.toLocaleString('fr-FR')} <span className="text-xs font-normal text-gray-400">FCFA</span></p>
+              <p className="text-xs text-purple-500 font-medium">Reçus (libérés)</p>
+            </div>
+            {escrowEnAttente > 0 && (
+              <div className="text-right">
+                <p className="text-xl font-black text-amber-600">{escrowEnAttente.toLocaleString('fr-FR')} <span className="text-xs font-normal text-gray-400">FCFA</span></p>
+                <p className="text-xs text-amber-500 font-medium">En attente</p>
+              </div>
+            )}
+            {escrowLibere > 0 && (
+              <a href="/hotelier/retraits"
+                className="shrink-0 flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-colors">
+                <ArrowDownToLine size={14} /> Retirer
+              </a>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

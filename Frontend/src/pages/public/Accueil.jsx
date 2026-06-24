@@ -109,12 +109,15 @@ export default function Accueil() {
       .then(res => {
         if (res.data && res.data.length > 0) {
           setEvenements(res.data.map((e, i) => ({
+            id: e.id,
             nom: e.nom,
             date: e.date_debut
               ? `${new Date(e.date_debut).getDate()} ${MOIS_COURTS[new Date(e.date_debut).getMonth()]}`
               : '',
             lieu: e.villes_concernees?.[0] || e.region || '',
             couleur: COULEURS_EVT[i % COULEURS_EVT.length],
+            latitude: e.latitude,
+            longitude: e.longitude,
           })))
         }
       })
@@ -291,7 +294,14 @@ export default function Accueil() {
           <div className="w-px h-5 bg-gray-100 shrink-0" />
           {evenements.map((ev) => (
             <button key={ev.nom}
-              onClick={() => navigate(`/recherche?ville=${ev.lieu}`)}
+              onClick={() => {
+                const params = new URLSearchParams({ ville: ev.lieu })
+                if (ev.latitude && ev.longitude) {
+                  params.set('point_interet', String(ev.id))
+                  params.set('type', 'evenement')
+                }
+                navigate(`/recherche?${params.toString()}`)
+              }}
               className={`flex items-center gap-2 px-4 py-2 rounded-full border text-sm font-bold whitespace-nowrap shrink-0 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${ev.couleur}`}>
               {ev.nom}
               <span className="opacity-40">·</span>

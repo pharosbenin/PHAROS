@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Star, MessageSquare, CheckCircle, Send, Loader } from 'lucide-react'
 import SidebarHotelier from '../../components/common/SidebarHotelier'
 import api from '../../services/api'
-import usePolling from '../../hooks/usePolling'
+import { useHotelActif } from '../../context/HotelActifContext'
 
 function EtoilesMoyenne({ note }) {
   return (
@@ -15,6 +15,7 @@ function EtoilesMoyenne({ note }) {
 }
 
 export default function GestionAvis() {
+  const { hotelActif } = useHotelActif()
   const [avis, setAvis] = useState([])
   const [chargement, setChargement] = useState(true)
   const [filtreNote, setFiltreNote] = useState(0)
@@ -23,12 +24,20 @@ export default function GestionAvis() {
   const [texteReponse, setTexteReponse] = useState('')
   const [enEnvoi, setEnEnvoi] = useState(false)
 
-  usePolling(() => {
-    api.get('/gestionnaire/avis/')
+  const charger = useCallback(() => {
+    if (!hotelActif) return
+    api.get(`/gestionnaire/avis/?hotel_id=${hotelActif.id}`)
       .then(res => setAvis(res.data))
       .catch(err => console.error('Erreur chargement avis', err))
       .finally(() => setChargement(false))
-  }, 30000)
+  }, [hotelActif?.id])
+
+  useEffect(() => {
+    setChargement(true)
+    charger()
+    const timer = setInterval(charger, 30000)
+    return () => clearInterval(timer)
+  }, [charger])
 
   const avisFiltres = avis
     .filter(a => filtreNote === 0 || a.note === filtreNote)

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Hotel, Users, Percent,
-  CalendarDays, ShieldAlert, LogOut, MessageSquare,
+  CalendarDays, ShieldAlert, LogOut, MessageSquare, Wallet,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
@@ -13,6 +13,8 @@ export default function SidebarAdmin() {
   const [demandesCount, setDemandesCount] = useState(0)
   const [messagesNonLus, setMessagesNonLus] = useState(0)
 
+  const [retraitsCount, setRetraitsCount] = useState(0)
+
   useEffect(() => {
     api.get('/admin/demandes-upgrade/?statut=en_attente')
       .then(res => setDemandesCount((res.data || []).length))
@@ -20,6 +22,9 @@ export default function SidebarAdmin() {
     api.get('/admin/contacts/')
       .then(res => setMessagesNonLus(res.data?.non_lus ?? 0))
       .catch(() => setMessagesNonLus(0))
+    api.get('/admin/retraits/?statut=en_attente')
+      .then(res => setRetraitsCount(res.data?.en_attente_count ?? 0))
+      .catch(() => setRetraitsCount(0))
   }, [])
 
   const navItems = [
@@ -30,6 +35,7 @@ export default function SidebarAdmin() {
     { to: '/admin/evenements', icon: CalendarDays, label: 'Événements' },
     { to: '/admin/moderation', icon: ShieldAlert, label: 'Modération' },
     { to: '/admin/messages', icon: MessageSquare, label: 'Messages', badge: messagesNonLus },
+    { to: '/admin/retraits', icon: Wallet, label: 'Retraits', badge: retraitsCount },
   ]
 
   return (

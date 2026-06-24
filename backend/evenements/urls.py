@@ -5,6 +5,7 @@ urlpatterns = [
     # Public
     path('evenements/', views.evenements_actifs, name='evenements_actifs'),
     path('evenements/<int:pk>/', views.detail_evenement, name='detail_evenement'),
+    path('villes/<str:ville>/points-interet/', views.points_interet_ville, name='points_interet_ville'),
 
     # Admin
     path('admin/evenements/', views.GestionEvenements.as_view(), name='gestion_evenements'),

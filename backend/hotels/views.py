@@ -23,7 +23,8 @@ class RechercheHotels(generics.ListAPIView):
     permission_classes = [AllowAny]
 
     def get_queryset(self):
-        from evenements.models import MiseEnAvantHotel
+        from evenements.models import MiseEnAvantHotel, PointInteret, EvenementNational
+        from evenements.utils import distance_km
         qs = Hotel.objects.filter(statut='valide')
         params = self.request.query_params
         if ville := params.get('ville'):
@@ -35,7 +36,35 @@ class RechercheHotels(generics.ListAPIView):
         if capacite := params.get('capacite'):
             qs = qs.filter(types_chambres__capacite__gte=capacite).distinct()
 
-        # Boost événement : hôtels PRO avec MiseEnAvantHotel active remontent en tête
+        point_id = params.get('point_interet')
+        point_type = params.get('type')
+
+        # Tri par distance si point d'intérêt avec coordonnées valides
+        if point_id and point_type in ('lieu', 'evenement'):
+            coords = None
+            try:
+                if point_type == 'lieu':
+                    pt = PointInteret.objects.get(pk=point_id, actif=True)
+                    coords = (float(pt.latitude), float(pt.longitude))
+                else:
+                    evt = EvenementNational.objects.get(pk=point_id, latitude__isnull=False, longitude__isnull=False)
+                    coords = (float(evt.latitude), float(evt.longitude))
+            except (PointInteret.DoesNotExist, EvenementNational.DoesNotExist, ValueError):
+                coords = None
+
+            if coords:
+                ref_lat, ref_lng = coords
+                hotels_list = list(qs)
+                for h in hotels_list:
+                    if h.latitude and h.longitude:
+                        h._distance_km = distance_km(ref_lat, ref_lng, float(h.latitude), float(h.longitude))
+                    else:
+                        h._distance_km = 9999.0
+                hotels_list.sort(key=lambda h: h._distance_km)
+                self._tri_distance = True
+                return hotels_list
+
+        # Tri par défaut
         today = timezone.now().date()
         boost_actif = MiseEnAvantHotel.objects.filter(
             hotel=OuterRef('pk'),
@@ -46,6 +75,24 @@ class RechercheHotels(generics.ListAPIView):
         )
         qs = qs.annotate(est_booste=Exists(boost_actif))
         return qs.order_by('-est_booste', '-type_abonnement', '-note_moyenne')
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['tri_distance'] = getattr(self, '_tri_distance', False)
+        return ctx
+
+    def list(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        if isinstance(queryset, list):
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        queryset = self.filter_queryset(queryset)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 
 @api_view(['GET'])

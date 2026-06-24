@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { Star, MapPin, Wifi, Car, Coffee, Waves, Heart } from 'lucide-react'
+import { Star, MapPin, Wifi, Car, Coffee, Waves, Heart, Navigation } from 'lucide-react'
 
 const BACKEND_URL = 'http://localhost:8000'
 function mediaUrl(path) {
@@ -26,6 +26,12 @@ const ICONES_EQ = {
 
 const LABELS_EQ = { wifi: 'WiFi', parking: 'Parking', restaurant: 'Restaurant', piscine: 'Piscine' }
 
+function formaterDistance(km) {
+  if (!km && km !== 0) return null
+  if (km < 1) return `${Math.round(km * 1000)} m`
+  return `${km.toFixed(1).replace('.', ',')} km`
+}
+
 function NoteBadge({ note }) {
   const n = parseFloat(note) || 0
   const couleur = n >= 4.5 ? 'bg-emerald-500' : n >= 4.0 ? 'bg-blue-600' : 'bg-amber-500'
@@ -41,7 +47,8 @@ function NoteBadge({ note }) {
 export default function CarteHotel({ hotel, vue = 'grille', estBooste = false }) {
   const {
     id, nom, localisation, ville, prix_min, prix_min_original, a_promotion,
-    note_moyenne, nb_avis, abonnement, equipements = [], etoiles, photo_principale
+    note_moyenne, nb_avis, abonnement, equipements = [], etoiles, photo_principale,
+    distance_km
   } = hotel
 
   const note = parseFloat(note_moyenne) || 0
@@ -61,6 +68,12 @@ export default function CarteHotel({ hotel, vue = 'grille', estBooste = false })
           ) : abonnement === 'pro' && (
             <span className="absolute top-3 left-3 bg-[#F57C2B] text-white text-xs font-black px-2.5 py-1 rounded-full shadow-md">
               Pro
+            </span>
+          )}
+          {distance_km != null && (
+            <span className="absolute bottom-3 left-3 bg-[#0D1B40]/80 text-white text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+              <Navigation size={10} />
+              {formaterDistance(distance_km)}
             </span>
           )}
         </div>
@@ -136,6 +149,13 @@ export default function CarteHotel({ hotel, vue = 'grille', estBooste = false })
         >
           <Heart size={14} className="text-gray-300 hover:text-red-500 transition-colors" />
         </button>
+
+        {distance_km != null && (
+          <span className="absolute bottom-3 left-3 bg-[#0D1B40]/80 text-white text-xs font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+            <Navigation size={10} />
+            {formaterDistance(distance_km)}
+          </span>
+        )}
 
         {a_promotion && (
           <span className="absolute bottom-12 left-3 bg-red-500 text-white text-xs font-black px-2.5 py-1 rounded-full shadow-md">

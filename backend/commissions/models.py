@@ -90,3 +90,41 @@ class Commission(models.Model):
 
     def __str__(self):
         return f"Commission {self.hotel.nom} — {self.montant_commission} XOF"
+
+
+class Retrait(models.Model):
+    STATUTS = [
+        ('en_attente', 'En attente'),
+        ('approuve', 'Approuvé'),
+        ('rejete', 'Rejeté'),
+    ]
+    METHODES = [
+        ('mtn', 'MTN Mobile Money'),
+        ('moov', 'Moov Money'),
+        ('carte', 'Carte bancaire'),
+    ]
+
+    hotel = models.ForeignKey('hotels.Hotel', on_delete=models.CASCADE, related_name='retraits')
+    demandeur = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, related_name='retraits_demandes'
+    )
+    montant = models.DecimalField(max_digits=12, decimal_places=2)
+    methode = models.CharField(max_length=10, choices=METHODES)
+    numero_telephone = models.CharField(max_length=20)
+    statut = models.CharField(max_length=20, choices=STATUTS, default='en_attente')
+    motif_rejet = models.TextField(blank=True)
+    traite_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='retraits_traites'
+    )
+    date_demande = models.DateTimeField(auto_now_add=True)
+    date_traitement = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-date_demande']
+        verbose_name = 'Retrait'
+        verbose_name_plural = 'Retraits'
+
+    def __str__(self):
+        return f"Retrait {self.hotel.nom} — {self.montant} FCFA ({self.get_statut_display()})"

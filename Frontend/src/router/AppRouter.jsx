@@ -32,6 +32,7 @@ import GestionRestauration from '../pages/hotelier/GestionRestauration'
 import GestionReservations from '../pages/hotelier/GestionReservations'
 import GestionAvis from '../pages/hotelier/GestionAvis'
 import GestionAbonnements from '../pages/hotelier/GestionAbonnements'
+import GestionRetraits from '../pages/hotelier/GestionRetraits'
 
 // Pages admin
 import DashboardAdmin from '../pages/admin/DashboardAdmin'
@@ -41,6 +42,7 @@ import GestionCommissions from '../pages/admin/GestionCommissions'
 import GestionEvenements from '../pages/admin/GestionEvenements'
 import Moderation from '../pages/admin/Moderation'
 import GestionMessages from '../pages/admin/GestionMessages'
+import GestionRetraitsAdmin from '../pages/admin/GestionRetraitsAdmin'
 
 export default function AppRouter() {
   return (
@@ -93,6 +95,9 @@ export default function AppRouter() {
         <Route path="/hotelier/abonnements" element={
           <ProtectedRoute role="gestionnaire"><HotelierGuard><HotelActifProvider><GestionAbonnements /></HotelActifProvider></HotelierGuard></ProtectedRoute>
         } />
+        <Route path="/hotelier/retraits" element={
+          <ProtectedRoute role="gestionnaire"><HotelierGuard><HotelActifProvider><GestionRetraits /></HotelActifProvider></HotelierGuard></ProtectedRoute>
+        } />
 
         {/* Admin */}
         <Route path="/admin/dashboard" element={
@@ -115,6 +120,9 @@ export default function AppRouter() {
         } />
         <Route path="/admin/messages" element={
           <ProtectedRoute role="admin"><GestionMessages /></ProtectedRoute>
+        } />
+        <Route path="/admin/retraits" element={
+          <ProtectedRoute role="admin"><GestionRetraitsAdmin /></ProtectedRoute>
         } />
 
         <Route path="*" element={<Navigate to="/" replace />} />

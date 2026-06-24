@@ -63,7 +63,14 @@ class ReservationListeSerializer(serializers.ModelSerializer):
     def get_commission_taux(self, obj):
         return 5 if obj.hotel.type_abonnement == 'pro' else 3
 
+    def get_montant_hotel(self, obj):
+        try:
+            return float(obj.paiement.montant_hotel)
+        except Exception:
+            return None
+
     commission_taux = serializers.SerializerMethodField()
+    montant_hotel = serializers.SerializerMethodField()
 
     class Meta:
         model = Reservation
@@ -73,7 +80,8 @@ class ReservationListeSerializer(serializers.ModelSerializer):
                   'nom_client', 'prenom_client', 'email_client', 'telephone_client',
                   'date_arrivee', 'date_depart', 'nb_nuits', 'nb_adultes', 'prix_total',
                   'statut', 'avis_disponible', 'a_soumis_avis',
-                  'date_creation', 'date_paiement', 'annulation_info', 'commission_taux')
+                  'date_creation', 'date_paiement', 'annulation_info', 'commission_taux',
+                  'montant_hotel')
 
 
 class ReservationDetailSerializer(serializers.ModelSerializer):

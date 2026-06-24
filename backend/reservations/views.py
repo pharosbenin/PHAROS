@@ -49,17 +49,18 @@ def _finaliser_sejour(reservation):
         reservation_numero=str(reservation.numero),
     )
 
-    # Notification client — invitation à laisser un avis
-    Notification.objects.create(
-        destinataire=reservation.client,
-        type='info',
-        titre='Séjour terminé — Donnez votre avis !',
-        message=(
-            f'Votre séjour à {reservation.hotel.nom} est terminé. '
-            f'Votre avis est maintenant disponible. Partagez votre expérience !'
-        ),
-        reservation_numero=str(reservation.numero),
-    )
+    # Notification client — invitation à laisser un avis (uniquement si le client a un compte)
+    if reservation.client is not None:
+        Notification.objects.create(
+            destinataire=reservation.client,
+            type='info',
+            titre='Séjour terminé — Donnez votre avis !',
+            message=(
+                f'Votre séjour à {reservation.hotel.nom} est terminé. '
+                f'Votre avis est maintenant disponible. Partagez votre expérience !'
+            ),
+            reservation_numero=str(reservation.numero),
+        )
 
 
 def _recompute_disponibilite(type_chambre):
@@ -80,6 +81,14 @@ def _recompute_disponibilite(type_chambre):
 
 # --- Création de réservation (clients connectés ou invités) ---
 
+def _purger_en_attente():
+    """Supprime toutes les réservations non payées créées il y a plus de 1 heure."""
+    from django.utils import timezone as tz
+    from datetime import timedelta
+    seuil = tz.now() - timedelta(hours=1)
+    Reservation.objects.filter(statut='en_attente', date_creation__lt=seuil).delete()
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def creer_reservation(request):
@@ -91,6 +100,7 @@ def creer_reservation(request):
             )
         if request.user.est_suspendu:
             return Response({'detail': 'Votre compte a été suspendu.'}, status=status.HTTP_403_FORBIDDEN)
+    _purger_en_attente()
     serializer = ReservationCreerSerializer(data=request.data, context={'request': request})
     if serializer.is_valid():
         reservation = serializer.save()
@@ -244,16 +254,20 @@ def _verifier_fenetre_confirmation(reservation):
 
 
 def _proprietaire_autorise(reservation, request):
-    """Autorise le client authentifié propriétaire, ou — pour une réservation invité
-    (sans compte) — quiconque fournit l'email exact utilisé lors de la réservation.
-    Un utilisateur authentifié dont l'email correspond à email_client est aussi autorisé."""
-    if not request.user.is_authenticated:
-        email = (request.data.get('email_client') or request.query_params.get('email_client') or '').strip().lower()
-        return bool(email) and email == reservation.email_client.lower()
-    if reservation.client is not None:
-        return reservation.client == request.user
-    # Réservation invité : l'utilisateur connecté est reconnu par son email
-    return request.user.email.lower() == reservation.email_client.lower()
+    """Autorise le client authentifié propriétaire, ou quiconque fournissant l'email
+    exact utilisé à la réservation (invité OU compte) via la page de suivi."""
+    # Propriétaire connecté
+    if request.user.is_authenticated and reservation.client == request.user:
+        return True
+    # Accès par email — valide pour invité ET pour réservation avec compte (page suivi)
+    # UUID + email offrent la même garantie de sécurité que le login
+    email = (request.data.get('email_client') or request.query_params.get('email_client') or '').strip().lower()
+    if email:
+        return email == reservation.email_client.lower()
+    # Dernier recours : utilisateur connecté dont l'email correspond (réservation invité migrée)
+    if request.user.is_authenticated:
+        return request.user.email.lower() == reservation.email_client.lower()
+    return False
 
 
 @api_view(['POST'])
@@ -606,11 +620,9 @@ class MesReservations(generics.ListAPIView):
     def get_queryset(self):
         from django.db.models import Q
         user = self.request.user
-        # Réservations du compte + réservations invité non encore rattachées au même email
-        # (jamais une réservation déjà rattachée à un AUTRE compte).
         return Reservation.objects.filter(
             Q(client=user) | Q(client__isnull=True, email_client__iexact=user.email)
-        ).distinct()
+        ).exclude(statut='en_attente').distinct()
 
 
 # --- Espace gestionnaire ---
@@ -620,7 +632,10 @@ class ReservationsHotel(generics.ListAPIView):
     permission_classes = [IsAuthenticated, EstGestionnaire, EstNonSuspendu, EstHotelValide]
 
     def get_queryset(self):
-        qs = Reservation.objects.filter(hotel__gestionnaire=self.request.user)
+        qs = Reservation.objects.filter(hotel__gestionnaire=self.request.user).exclude(statut='en_attente')
+        hotel_id = self.request.query_params.get('hotel_id')
+        if hotel_id:
+            qs = qs.filter(hotel_id=hotel_id)
         statut = self.request.query_params.get('statut')
         if statut:
             qs = qs.filter(statut=statut)

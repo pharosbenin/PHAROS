@@ -183,10 +183,16 @@ export default function SuiviReservation() {
 
   const confirmerSejour = async () => {
     setConfirmEnvoi(true)
+    setErreur('')
     try {
       const res = await api.post(`/reservations/${reservation.numero}/confirmer-sejour/`, { email_client: email.trim() })
+      // Mise à jour immédiate depuis la réponse du POST
       setReservation(r => ({ ...r, statut: res.data.statut }))
       setNotif(res.data.message)
+      // Tentative de rechargement complet — silencieux si échec (token absent, etc.)
+      api.get(`/reservations/${reservation.numero}/`, { params: { email_client: email.trim() } })
+        .then(updated => setReservation(updated.data))
+        .catch(() => {})
     } catch (err) {
       setErreur(err.response?.data?.detail || 'Erreur lors de la confirmation.')
     } finally {

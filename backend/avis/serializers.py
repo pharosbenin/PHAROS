@@ -2,6 +2,14 @@ from rest_framework import serializers
 from .models import Avis, SignalementAvis, SignalementContenu, SignalementHotel
 
 
+def _est_proprietaire(reservation, user):
+    """Vérifie qu'un utilisateur est bien le propriétaire d'une réservation.
+    Accepte les réservations invité dont l'email correspond au compte connecté."""
+    if reservation.client is not None:
+        return reservation.client == user
+    return reservation.email_client.lower() == user.email.lower()
+
+
 class AvisSerializer(serializers.ModelSerializer):
     client_nom = serializers.SerializerMethodField()
     hotel_nom = serializers.CharField(source='hotel.nom', read_only=True)
@@ -29,7 +37,7 @@ class AvisCreerSerializer(serializers.ModelSerializer):
         if reservation:
             if reservation.hotel != attrs['hotel']:
                 raise serializers.ValidationError({'reservation': "Cette réservation ne correspond pas à cet hôtel."})
-            if reservation.client != request.user:
+            if not _est_proprietaire(reservation, request.user):
                 raise serializers.ValidationError({'reservation': "Cette réservation ne vous appartient pas."})
             if reservation.statut != 'terminee':
                 raise serializers.ValidationError({'reservation': "Vous ne pouvez laisser un avis qu'après votre séjour."})
@@ -55,7 +63,7 @@ class SignalementContenuSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context['request']
         reservation = attrs.get('reservation')
-        if reservation and reservation.client != request.user:
+        if reservation and not _est_proprietaire(reservation, request.user):
             raise serializers.ValidationError({'reservation': "Cette réservation ne vous appartient pas."})
         return attrs
 

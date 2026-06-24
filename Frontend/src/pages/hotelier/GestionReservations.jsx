@@ -36,15 +36,14 @@ export default function GestionReservations() {
   const [voirNotifs, setVoirNotifs] = useState(false)
 
   const charger = async () => {
+    if (!hotelActif) return
     try {
       const [resRes, resNotifs] = await Promise.all([
-        api.get('/gestionnaire/reservations/'),
+        api.get(`/gestionnaire/reservations/?hotel_id=${hotelActif.id}`),
         api.get('/notifications/'),
       ])
       setHotel(hotelActif)
-      setReservations(hotelActif
-        ? resRes.data.filter(r => r.hotel_id === hotelActif.id)
-        : resRes.data)
+      setReservations(resRes.data)
       setNotifications(resNotifs.data)
     } catch (err) {
       console.error('Erreur chargement réservations', err)
@@ -104,12 +103,24 @@ export default function GestionReservations() {
     })
 
   const nbAConfirmer = reservations.filter(r => PEUT_CONFIRMER.includes(r.statut)).length
-  const escrowTotal = reservations.reduce((sum, r) => {
-    if (['annulee', 'remboursee'].includes(r.statut)) {
-      return sum + parseFloat(r.annulation_info?.hotel_recoit || 0)
-    }
-    return sum + parseFloat(r.prix_total || 0) * (1 - taux / 100)
-  }, 0)
+  // Fonds libérés = séjours terminés (les deux parties ont confirmé)
+  const escrowTotal = reservations
+    .filter(r => r.statut === 'terminee')
+    .reduce((sum, r) => {
+      if (r.montant_hotel != null) return sum + r.montant_hotel
+      const brut = parseFloat(r.prix_total || 0)
+      const commission = r.commission_taux ?? taux
+      return sum + Math.round(brut * (1 - commission / 100))
+    }, 0)
+  // Fonds en attente = séjours payés mais pas encore confirmés par les deux parties
+  const escrowEnAttente = reservations
+    .filter(r => STATUTS_ACTIFS.includes(r.statut))
+    .reduce((sum, r) => {
+      if (r.montant_hotel != null) return sum + r.montant_hotel
+      const brut = parseFloat(r.prix_total || 0)
+      const commission = r.commission_taux ?? taux
+      return sum + Math.round(brut * (1 - commission / 100))
+    }, 0)
 
   if (chargement) return (
     <div className="flex min-h-screen bg-gray-50">
@@ -185,11 +196,12 @@ export default function GestionReservations() {
           </div>
         )}
 
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[
-            { label: 'Total', valeur: reservations.length, couleur: 'text-gray-800' },
+            { label: 'Total réservations', valeur: reservations.length, couleur: 'text-gray-800' },
             { label: 'Actives', valeur: reservations.filter(r => STATUTS_ACTIFS.includes(r.statut)).length, couleur: 'text-green-600' },
-            { label: 'Escrow total', valeur: Math.round(escrowTotal).toLocaleString('fr-FR') + ' FCFA', couleur: 'text-blue-600' },
+            { label: 'Fonds libérés', valeur: Math.round(escrowTotal).toLocaleString('fr-FR') + ' FCFA', couleur: 'text-purple-700' },
+            { label: 'En attente de libération', valeur: Math.round(escrowEnAttente).toLocaleString('fr-FR') + ' FCFA', couleur: 'text-amber-600' },
           ].map((s, i) => (
             <div key={i} className="bg-white rounded-2xl border border-gray-100 p-4 text-center">
               <p className={`text-xl font-black ${s.couleur}`}>{s.valeur}</p>
@@ -243,7 +255,7 @@ export default function GestionReservations() {
                   const IconeS = s.icon
                   const montant = parseFloat(r.prix_total || 0)
                   const commission = Math.round(montant * taux / 100)
-                  const escrow = montant - commission
+                  const escrow = r.montant_hotel != null ? r.montant_hotel : montant - commission
                   const estAnnulee = r.statut === 'annulee' || r.statut === 'remboursee'
                   const hotelRecoit = r.annulation_info ? r.annulation_info.hotel_recoit : 0
                   return (
@@ -314,7 +326,7 @@ export default function GestionReservations() {
         {detailReserv && (() => {
           const montant = parseFloat(detailReserv.prix_total || 0)
           const commission = Math.round(montant * taux / 100)
-          const escrow = montant - commission
+          const escrow = detailReserv.montant_hotel != null ? detailReserv.montant_hotel : montant - commission
           const s = STATUTS[detailReserv.statut] ?? { label: detailReserv.statut, cls: 'bg-gray-100 text-gray-600', icon: Clock }
           const peutConfirmer = PEUT_CONFIRMER.includes(detailReserv.statut)
           return (

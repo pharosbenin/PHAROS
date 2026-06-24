@@ -20,6 +20,8 @@ class EvenementNational(models.Model):
     villes_concernees = models.JSONField(default=list, blank=True)
     est_actif = models.BooleanField(default=True)
     image = models.ImageField(upload_to='evenements/', null=True, blank=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     date_creation = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -38,6 +40,31 @@ class EvenementNational(models.Model):
     @property
     def est_a_venir(self):
         return timezone.now().date() < self.date_debut
+
+
+class PointInteret(models.Model):
+    CATEGORIES = [
+        ('historique', 'Site historique'),
+        ('culturel', 'Site culturel'),
+        ('religieux', 'Site religieux'),
+        ('naturel', 'Site naturel'),
+    ]
+    nom = models.CharField(max_length=200)
+    ville = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    categorie = models.CharField(max_length=20, choices=CATEGORIES)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6)
+    photo = models.ImageField(upload_to='points_interet/', null=True, blank=True)
+    actif = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['ville', 'nom']
+        verbose_name = 'Point d\'intérêt'
+        verbose_name_plural = 'Points d\'intérêt'
+
+    def __str__(self):
+        return f"{self.nom} ({self.ville})"
 
 
 EVENEMENTS_BENINOIS = [

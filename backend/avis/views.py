@@ -82,7 +82,11 @@ class AvisMonHotel(generics.ListAPIView):
     permission_classes = [IsAuthenticated, EstGestionnaire, EstNonSuspendu, EstHotelValide]
 
     def get_queryset(self):
-        return Avis.objects.filter(hotel__gestionnaire=self.request.user)
+        qs = Avis.objects.filter(hotel__gestionnaire=self.request.user)
+        hotel_id = self.request.query_params.get('hotel_id')
+        if hotel_id:
+            qs = qs.filter(hotel_id=hotel_id)
+        return qs
 
 
 # --- Admin ---

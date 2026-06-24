@@ -5,8 +5,8 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from accounts.permissions import EstAdmin
-from .models import EvenementNational, MiseEnAvantHotel
-from .serializers import EvenementSerializer, MiseEnAvantSerializer
+from .models import EvenementNational, MiseEnAvantHotel, PointInteret
+from .serializers import EvenementSerializer, MiseEnAvantSerializer, PointInteretSerializer
 
 
 # --- Public ---
@@ -44,6 +44,50 @@ def detail_evenement(request, pk):
     data = EvenementSerializer(evt).data
     data['hotels'] = HotelListeSerializer(hotels, many=True).data
     return Response(data)
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def points_interet_ville(request, ville):
+    today = timezone.now().date()
+
+    lieux = PointInteret.objects.filter(ville__iexact=ville, actif=True)
+    lieux_data = [
+        {
+            'id': p.id,
+            'type': 'lieu',
+            'nom': p.nom,
+            'description': p.description,
+            'categorie': p.categorie,
+            'latitude': float(p.latitude),
+            'longitude': float(p.longitude),
+            'photo': request.build_absolute_uri(p.photo.url) if p.photo else None,
+        }
+        for p in lieux
+    ]
+
+    evenements = EvenementNational.objects.filter(
+        est_actif=True,
+        date_fin__gte=today,
+        latitude__isnull=False,
+        longitude__isnull=False,
+    )
+    evenements = [e for e in evenements if ville.lower() in [v.lower() for v in e.villes_concernees]]
+    evenements_data = [
+        {
+            'id': e.id,
+            'type': 'evenement',
+            'nom': e.nom,
+            'description': e.description,
+            'categorie': e.categorie,
+            'latitude': float(e.latitude),
+            'longitude': float(e.longitude),
+            'photo': request.build_absolute_uri(e.image.url) if e.image else None,
+        }
+        for e in evenements
+    ]
+
+    return Response(lieux_data + evenements_data)
 
 
 # --- Admin ---

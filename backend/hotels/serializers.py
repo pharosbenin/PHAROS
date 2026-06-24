@@ -132,6 +132,11 @@ class HotelListeSerializer(serializers.ModelSerializer):
             (c.capacite for c in instance.types_chambres.all()), default=0
         )
         data['est_booste'] = getattr(instance, 'est_booste', False)
+        dist = getattr(instance, '_distance_km', None)
+        if dist is not None and dist < 9999:
+            data['distance_km'] = round(dist, 2)
+        else:
+            data['distance_km'] = None
         return data
 
     class Meta:
