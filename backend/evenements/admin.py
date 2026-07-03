@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import EvenementNational, MiseEnAvantHotel
+from .models import EvenementNational, MiseEnAvantHotel, PointInteret
 
 
 @admin.register(EvenementNational)
@@ -8,6 +8,13 @@ class EvenementAdmin(admin.ModelAdmin):
     list_filter = ('categorie', 'est_actif')
     search_fields = ('nom', 'region')
     list_editable = ('est_actif',)
+
+
+@admin.register(PointInteret)
+class PointInteretAdmin(admin.ModelAdmin):
+    list_display = ('nom', 'ville', 'categorie', 'actif')
+    list_filter = ('ville', 'categorie', 'actif')
+    search_fields = ('nom', 'ville')
 
 
 @admin.register(MiseEnAvantHotel)

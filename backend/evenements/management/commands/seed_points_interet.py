@@ -25,6 +25,15 @@ POINTS = [
     {'ville': 'Boukoumbé', 'nom': 'Villages Tata Somba', 'categorie': 'culturel', 'latitude': 10.1833, 'longitude': 1.1167, 'description': 'Architecture traditionnelle des Somba, patrimoine UNESCO.'},
     {'ville': 'Tanguiéta', 'nom': 'Cascades de Tanougou', 'categorie': 'naturel', 'latitude': 11.0500, 'longitude': 1.4500, 'description': 'Cascades naturelles dans le parc de la Pendjari.'},
     {'ville': 'Grand-Popo', 'nom': 'Plage de Grand-Popo / Bouche du Roy', 'categorie': 'naturel', 'latitude': 6.2833, 'longitude': 1.8167, 'description': 'Embouchure du fleuve Mono sur l\'Atlantique.'},
+    {'ville': 'Cotonou', 'nom': 'Monument Bio Guerra', 'categorie': 'historique', 'latitude': 6.3501411, 'longitude': 2.3874892, 'description': 'Monument en hommage au résistant Bio Guerra.'},
+    {'ville': 'Cotonou', 'nom': 'Cité Ministérielle', 'categorie': 'culturel', 'latitude': 6.3512042, 'longitude': 2.4046457, 'description': 'Quartier administratif regroupant les ministères du gouvernement.'},
+    {'ville': 'Cotonou', 'nom': 'Palais de la Marina (Présidence de la République)', 'categorie': 'historique', 'latitude': 6.3511961, 'longitude': 2.4090696, 'description': 'Siège de la présidence de la République du Bénin.'},
+    {'ville': 'Cotonou', 'nom': 'Place des Martyrs', 'categorie': 'historique', 'latitude': 6.3537399, 'longitude': 2.4046969, 'description': 'Place commémorative dédiée aux martyrs nationaux.'},
+    {'ville': 'Ouidah', 'nom': 'Mémorial Zoungbodji', 'categorie': 'historique', 'latitude': 6.3396958, 'longitude': 2.0892291, 'description': 'Mémorial dédié aux victimes de la traite négrière à Zoungbodji.'},
+    {'ville': 'Allada', 'nom': 'Palais Royal d\'Allada (Togoudo)', 'categorie': 'historique', 'latitude': 6.6639851, 'longitude': 2.1686788, 'description': 'Ancien palais royal du royaume d\'Allada, berceau de la dynastie Aja-Fon.'},
+    {'ville': 'Grand-Popo', 'nom': 'Bouche du Roy', 'categorie': 'naturel', 'latitude': 6.2922216, 'longitude': 1.9172859, 'description': 'Point précis de rencontre entre le fleuve Mono et l\'océan Atlantique.'},
+    {'ville': 'Nikki', 'nom': 'Palais Royal de Nikki', 'categorie': 'historique', 'latitude': 9.9363278, 'longitude': 3.2105884, 'description': 'Palais royal du royaume Wassangari, siège de la Fête du Gani.'},
+    {'ville': 'Tanguiéta', 'nom': 'Parc National de la Pendjari', 'categorie': 'naturel', 'latitude': 11.2481125, 'longitude': 1.5983959, 'description': 'Parc national abritant une faune sauvage exceptionnelle (éléphants, lions, buffles).'},
 ]
 
 
