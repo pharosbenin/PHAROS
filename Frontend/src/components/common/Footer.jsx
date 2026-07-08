@@ -3,17 +3,18 @@ import { MapPin, Phone, Mail } from 'lucide-react'
 
 export default function Footer() {
   return (
-    <footer className="bg-gray-900 text-gray-300 mt-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+    <footer className="bg-gray-900 text-gray-300 mt-1">
+      <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-5">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pb-0">
           {/* Branding */}
           <div className="md:col-span-1">
-            <div className="mb-4">
-              <img src="/logo.png.jpeg" alt="PHAROS BÉNIN" className="h-20 w-auto bg-white rounded-xl p-1" />
-            </div>
+            
             <p className="text-sm text-gray-400 leading-relaxed">
-              La première plateforme béninoise de réservation d'hébergements hôteliers et parahôteliers.
-            </p>
+              La  plateforme béninoise de réservation d'hébergements hôteliers et parahôteliers.
+            </p> 
+              <ul className="space-y-2 mt-2">
+             <li><Link to="/regles" className="  text-sm text-[#F57C2B] hover:text-orange-400 transition-colors font-medium">Règles de la plateforme</Link></li>
+            </ul>
             <div className="flex items-center gap-3 mt-4">
               <a href="#" className="w-9 h-9 bg-gray-800 hover:bg-blue-600 rounded-lg flex items-center justify-center transition-colors">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
@@ -26,15 +27,14 @@ export default function Footer() {
 
           {/* Liens rapides */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Navigation</h4>
+            <h4 className="text-white font-semibold mb-1">Navigation</h4>
             <ul className="space-y-2">
               <li><Link to="/" className="text-sm hover:text-white transition-colors">Accueil</Link></li>
               <li><Link to="/recherche" className="text-sm hover:text-white transition-colors">Rechercher un hôtel</Link></li>
               <li><Link to="/connexion" className="text-sm hover:text-white transition-colors">Se connecter</Link></li>
               <li><Link to="/suivi-reservation" className="text-sm hover:text-white transition-colors">Gérer ma réservation</Link></li>
               <li><Link to="/inscription-hotelier" className="text-sm hover:text-white transition-colors">Inscrire mon hôtel</Link></li>
-              <li><Link to="/regles" className="text-sm text-[#F57C2B] hover:text-orange-400 transition-colors font-medium">Règles de la plateforme</Link></li>
-            </ul>
+              </ul>
           </div>
 
           {/* Services */}
@@ -68,7 +68,7 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-gray-800 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
+        <div className="border-t border-gray-800 mt-4 pt-3 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-500">
           <p>© 2026 PHAROS BÉNIN. Tous droits réservés.</p>
           <div className="flex items-center gap-4">
             <Link to="/regles" className="hover:text-white transition-colors">Conditions d'utilisation</Link>

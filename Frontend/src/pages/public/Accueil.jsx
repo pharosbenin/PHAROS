@@ -4,6 +4,22 @@ import { Search, MapPin, Calendar, Users, Star, ChevronRight, ChevronLeft, Shiel
 import Layout from '../../components/common/Layout'
 import CarteHotel from '../../components/common/CarteHotel'
 import api from '../../services/api'
+import img1 from '../../../../image/pharos-img/1.jpeg'
+import img2 from '../../../../image/pharos-img/2.jpeg'
+import img3 from '../../../../image/pharos-img/3.jpeg'
+import img4 from '../../../../image/pharos-img/4.jpeg'
+import img5 from '../../../../image/pharos-img/5.jpeg'
+import img6 from '../../../../image/pharos-img/6.jpeg'
+import img7 from '../../../../image/pharos-img/7.jpeg'
+import img8 from '../../../../image/pharos-img/8.jpeg'
+import img9 from '../../../../image/pharos-img/9.jpeg'
+import img10 from '../../../../image/pharos-img/10.jpeg'
+import img11 from '../../../../image/pharos-img/11.jpeg'
+import img12 from '../../../../image/pharos-img/12.jpeg'
+import img13 from '../../../../image/pharos-img/13.jpeg'
+import img14 from '../../../../image/pharos-img/14.jpeg'
+import img15 from '../../../../image/pharos-img/15.jpeg'
+
 
 const BACKEND_URL = 'http://localhost:8000'
 function mediaUrl(path) {
@@ -46,7 +62,7 @@ const MOIS_COURTS = ['Jan', 'Fév', 'Mars', 'Avr', 'Mai', 'Juin', 'Juil', 'Août
 const STATS = [
   { valeur: '200+', label: 'Établissements' },
   { valeur: '15 000+', label: 'Réservations' },
-  { valeur: '12 villes', label: 'Au Bénin' },
+  { valeur: '60 villes+', label: 'Au Bénin' },
   { valeur: '4.7 / 5', label: 'Note moyenne' },
 ]
 
@@ -58,15 +74,22 @@ const STATS_ICONS = [
 ]
 
 const PHOTOS_HOTELS = [
-  'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1582719478250-c89cae4dc85b?w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1445019980597-93fa8acb246c?w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1551882547-ff40c63fe5fa?w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1542314831-068cd1dbfeeb?w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1496417263034-38ec4f0b665a?w=800&auto=format&fit=crop',
-  'https://images.unsplash.com/photo-1584132967334-10e028bd69f7?w=800&auto=format&fit=crop',
-]
+  img1,
+  img2,
+  img3,
+  img4,
+  img5,
+  img6,
+  img7,
+  img8,
+  img9,
+  img10,
+  img11,
+  img12,
+  img13,
+  img14,
+  img15
+];
 
 const GALERIE_FALLBACK = PHOTOS_HOTELS
 
@@ -179,11 +202,11 @@ export default function Accueil() {
 
       {/* ===== HERO ===== */}
       <section className="relative text-white overflow-hidden" style={{ minHeight: '720px' }}>
-        <img
-          src="/hero-benin%20(2).jpeg"
-          alt="Bénin"
-          className="absolute inset-0 w-full h-full object-cover object-center scale-[1.02]"
-        />
+       <img
+  src="/hero-benin%20(2).jpeg"
+  alt="Bénin"
+  className="absolute inset-0 w-full h-full object-cover object-center scale-[1.02] brightness-50"
+/>
         {/* Voile léger pour lisibilité du texte, image reste bien visible */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-black/10" />
 
@@ -199,7 +222,7 @@ export default function Accueil() {
 
             {/* Badge glassmorphism */}
             
-
+          
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tight mb-6">
               <span className="text-[#F57C2B] drop-shadow-lg">Pharos Bénin</span>{' '}
               <span className="text-white">est le phare</span><br />

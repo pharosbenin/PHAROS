@@ -35,7 +35,7 @@ const STATS = [
 ]
 
 const HISTOIRE = [
-  { Icon: Map,        titre: 'Plus de 12 villes couvertes',   desc: 'Des hôtels dans toutes les grandes villes du Bénin' },
+  { Icon: Map,        titre: 'Plus de 60 villes couvertes',   desc: 'Des hôtels dans toutes les grandes villes du Bénin' },
   { Icon: Smartphone, titre: '100% Mobile Money',     desc: 'MTN & Moov — paiements adaptés au contexte béninois' },
   { Icon: Target,     titre: "2 plans d'abonnement",  desc: 'Freemium et Pro  pour les hôteliers' },
 ]
@@ -104,7 +104,7 @@ export default function AboutPage() {
               béninoise
             </h1>
             <p className="text-white/70 text-lg leading-relaxed mb-8 max-w-lg">
-              PHAROS BÉNIN est la première plateforme de réservation hôtelière dédiée au Bénin.
+              PHAROS BÉNIN est une plateforme de réservation hôtelière dédiée au Bénin.
               Nous connectons les voyageurs aux meilleurs établissements du pays, du simple lodge
               à l'hôtel de luxe, avec des paiements 100% Mobile Money.
             </p>
@@ -165,7 +165,7 @@ export default function AboutPage() {
       </section>
 
       {/* ── Mission ── */}
-      <section className="py-16 px-4 bg-[#F4F6FB]">
+      <section className="pt-10 pb-4 px-4 bg-[#F4F6FB]">
         <div className="max-w-3xl mx-auto">
           <div className="relative bg-white rounded-3xl shadow-2xl p-8 sm:p-10 flex gap-6 items-start border-l-4 border-[#F57C2B] overflow-hidden">
             <div className="absolute top-0 right-0 w-40 h-40 bg-[#F57C2B]/5 rounded-full translate-x-16 -translate-y-16 pointer-events-none" />
@@ -186,7 +186,7 @@ export default function AboutPage() {
       </section>
 
       {/* ── Fonctionnalités ── */}
-      <section className="py-20 px-4 bg-[#F4F6FB]">
+      <section className="pt-15 pb-10 px-4 bg-[#F4F6FB]">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-14">
           

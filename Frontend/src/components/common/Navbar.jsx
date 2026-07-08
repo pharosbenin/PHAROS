@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { Menu, X, User, LogOut, Hotel, LayoutDashboard } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
@@ -8,6 +8,26 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
+
+  const isActive = (path) => location.pathname === path
+
+  const navLinkClass = (path) =>
+    `text-[14px] font-extrabold tracking-wide transition-colors relative group ${
+      isActive(path) ? 'text-[#F57C2B]' : 'text-black hover:text-[#F57C2B]'
+    }`
+
+  const navUnderlineClass = (path) =>
+    `absolute -bottom-1 left-0 h-0.5 bg-[#F57C2B] transition-all duration-300 ${
+      isActive(path) ? 'w-full' : 'w-0 group-hover:w-full'
+    }`
+
+  const mobileNavLinkClass = (path) =>
+    `block px-4 py-2 text-sm rounded-lg transition-colors ${
+      isActive(path)
+        ? 'text-[#F57C2B] bg-orange-50'
+        : 'text-black hover:text-[#F57C2B] hover:bg-orange-50'
+    }`
 
   const handleLogout = () => {
     logout()
@@ -32,26 +52,26 @@ export default function Navbar() {
 
           {/* Navigation desktop */}
           <div className="hidden md:flex items-center gap-8">
-            <Link to="/" className="text-black hover:text-[#F57C2B] text-[14px] font-extrabold tracking-wide transition-colors relative group">
+            <Link to="/" className={navLinkClass('/')}>
               Accueil
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#F57C2B] group-hover:w-full transition-all duration-300" />
+              <span className={navUnderlineClass('/')} />
             </Link>
-            <Link to="/recherche" className="text-black hover:text-[#F57C2B] text-[14px] font-extrabold tracking-wide transition-colors relative group">
+            <Link to="/recherche" className={navLinkClass('/recherche')}>
               Rechercher
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#F57C2B] group-hover:w-full transition-all duration-300" />
+              <span className={navUnderlineClass('/recherche')} />
             </Link>
-            <Link to="/a-propos" className="text-black hover:text-[#F57C2B] text-[14px] font-extrabold tracking-wide transition-colors relative group">
+            <Link to="/a-propos" className={navLinkClass('/a-propos')}>
               À propos
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#F57C2B] group-hover:w-full transition-all duration-300" />
+              <span className={navUnderlineClass('/a-propos')} />
             </Link>
-            <Link to="/contact" className="text-black hover:text-[#F57C2B] text-[14px] font-extrabold tracking-wide transition-colors relative group">
+            <Link to="/contact" className={navLinkClass('/contact')}>
               Contact
-              <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#F57C2B] group-hover:w-full transition-all duration-300" />
+              <span className={navUnderlineClass('/contact')} />
             </Link>
             {!user && (
-              <Link to="/inscription-hotelier" className="text-black hover:text-[#F57C2B] text-[14px] font-extrabold tracking-wide transition-colors relative group">
+              <Link to="/inscription-hotelier" className={navLinkClass('/inscription-hotelier')}>
                 Espace hôtelier
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#F57C2B] group-hover:w-full transition-all duration-300" />
+                <span className={navUnderlineClass('/inscription-hotelier')} />
               </Link>
             )}
           </div>
@@ -129,24 +149,30 @@ export default function Navbar() {
         {/* Menu mobile ouvert */}
         {menuOpen && (
           <div className="md:hidden border-t border-gray-100 py-3 space-y-1">
-            <Link to="/" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-black hover:text-[#F57C2B] hover:bg-orange-50 rounded-lg transition-colors">
+            <Link to="/" onClick={() => setMenuOpen(false)} className={mobileNavLinkClass('/')}>
               Accueil
             </Link>
-            <Link to="/recherche" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-black hover:text-[#F57C2B] hover:bg-orange-50 rounded-lg transition-colors">
+            <Link to="/recherche" onClick={() => setMenuOpen(false)} className={mobileNavLinkClass('/recherche')}>
               Rechercher
             </Link>
-            <Link to="/a-propos" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-black hover:text-[#F57C2B] hover:bg-orange-50 rounded-lg transition-colors">
+            <Link to="/a-propos" onClick={() => setMenuOpen(false)} className={mobileNavLinkClass('/a-propos')}>
               À propos
             </Link>
-            <Link to="/contact" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-black hover:text-[#F57C2B] hover:bg-orange-50 rounded-lg transition-colors">
+            <Link to="/contact" onClick={() => setMenuOpen(false)} className={mobileNavLinkClass('/contact')}>
               Contact
             </Link>
             {!user && (
               <>
-                <Link to="/connexion" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-black hover:text-[#F57C2B] hover:bg-orange-50 rounded-lg transition-colors">
+                <Link to="/connexion" onClick={() => setMenuOpen(false)} className={mobileNavLinkClass('/connexion')}>
                   Se connecter
                 </Link>
-                <Link to="/inscription-hotelier" onClick={() => setMenuOpen(false)} className="block px-4 py-2 text-sm text-blue-600 hover:text-[#F57C2B] font-medium hover:bg-orange-50 rounded-lg transition-colors">
+                <Link
+                  to="/inscription-hotelier"
+                  onClick={() => setMenuOpen(false)}
+                  className={`block px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                    isActive('/inscription-hotelier') ? 'text-[#F57C2B] bg-orange-50' : 'text-blue-600 hover:text-[#F57C2B] hover:bg-orange-50'
+                  }`}
+                >
                   Inscrire mon hôtel
                 </Link>
               </>
