@@ -4,10 +4,11 @@ import { Link, useNavigate } from 'react-router-dom'
 import { QRCodeSVG } from 'qrcode.react'
 import {
   Calendar, CalendarCheck, MapPin, QrCode, Star, Clock, CheckCircle, XCircle, RotateCcw,
-  ChevronRight, User, Mail, Phone, Edit3, AlertCircle, Smartphone, Search,
+  ChevronRight, User, Mail, Phone, Edit3, AlertCircle, Search,
   X, Building2, Key, Trash2, FileText, Shield, Info, Loader2, Utensils
 } from 'lucide-react'
 import SidebarClient from '../../components/common/SidebarClient'
+import AssistanceVoyageur from '../../components/common/AssistanceVoyageur'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
 
@@ -710,6 +711,7 @@ function formatCountdown(sec) {
 
 function CarteReservation({ reservation, onConfirmerSejour, onModifier, onAnnuler, onNotif }) {
   const [qrOuvert, setQrOuvert] = useState(false)
+  const [assistanceOuverte, setAssistanceOuverte] = useState(false)
   // Avis
   const [localAvisDisponible, setLocalAvisDisponible] = useState(reservation.avisDisponible || reservation.statut === 'terminee')
   const [avisModalOuvert, setAvisModalOuvert] = useState(false)
@@ -854,6 +856,13 @@ function CarteReservation({ reservation, onConfirmerSejour, onModifier, onAnnule
             </Link>
           )}
 
+          {['payee', 'confirmee', 'en_cours', 'confirme_hotel', 'confirme_client', 'terminee'].includes(reservation.statut) && (
+            <button onClick={() => setAssistanceOuverte(true)}
+              className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+              <MapPin size={12} /> Mon Séjour
+            </button>
+          )}
+
           {peutAgir && (
             <>
               <button onClick={() => onModifier(reservation)}
@@ -916,6 +925,11 @@ function CarteReservation({ reservation, onConfirmerSejour, onModifier, onAnnule
               <p className="text-xs text-blue-600 font-mono mt-1 break-all">{reservation.numero}</p>
             </div>
           </div>
+        )}
+
+        {/* Modale Mon Séjour — portail vers document.body, indépendante de l'overflow-hidden de la carte */}
+        {assistanceOuverte && (
+          <AssistanceVoyageur numeroReservation={reservation.id} onFermer={() => setAssistanceOuverte(false)} />
         )}
 
         {/* Modale avis */}

@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'avis',
     'commissions',
     'evenements',
+    'assistance',
 ]
 
 MIDDLEWARE = [

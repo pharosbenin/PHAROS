@@ -6,6 +6,7 @@ import {
   AlertCircle, Loader2, Shield, Info, Download, Building2,
 } from 'lucide-react'
 import Layout from '../../components/common/Layout'
+import AssistanceVoyageur from '../../components/common/AssistanceVoyageur'
 import api from '../../services/api'
 
 const STATUTS = {
@@ -155,6 +156,7 @@ export default function SuiviReservation() {
   const [modalAnnul, setModalAnnul] = useState(false)
   const [notif, setNotif] = useState('')
   const [confirmEnvoi, setConfirmEnvoi] = useState(false)
+  const [assistanceOuverte, setAssistanceOuverte] = useState(false)
 
   const lancerRecherche = async (num, mail) => {
     if (!num.trim() || !mail.trim()) { setErreur('Renseignez le numéro de réservation et l\'email utilisés.'); return }
@@ -320,6 +322,12 @@ export default function SuiviReservation() {
 
             {/* Actions */}
             <div className="p-5 flex flex-wrap gap-2">
+              {['payee', 'confirmee', 'en_cours', 'confirme_hotel', 'confirme_client', 'terminee'].includes(reservation.statut) && (
+                <button onClick={() => setAssistanceOuverte(true)}
+                  className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold px-4 py-2 rounded-lg">
+                  <MapPin size={12} /> Mon Séjour
+                </button>
+              )}
               {((['payee', 'confirmee', 'en_cours'].includes(reservation.statut) && peutConfirmer) || reservation.statut === 'confirme_hotel') && (
                 <button onClick={confirmerSejour} disabled={confirmEnvoi}
                   className="flex items-center gap-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-300 text-white text-xs font-bold px-4 py-2 rounded-lg">
@@ -356,6 +364,14 @@ export default function SuiviReservation() {
             setNotif(`Réservation annulée. Remboursement de ${Math.round(montant).toLocaleString()} FCFA sous 24-72h.`)
             setModalAnnul(false)
           }}
+        />
+      )}
+
+      {assistanceOuverte && reservation && (
+        <AssistanceVoyageur
+          numeroReservation={reservation.numero}
+          email={email.trim()}
+          onFermer={() => setAssistanceOuverte(false)}
         />
       )}
     </Layout>
