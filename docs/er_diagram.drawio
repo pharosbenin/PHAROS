@@ -1,0 +1,512 @@
+<mxfile host="65bd71144e">
+    <diagram id="pharos-er" name="Diagramme ER PHAROS">
+        <mxGraphModel dx="1472" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1900" pageHeight="1500" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+
+                <!-- OTPVerification -->
+                <mxCell id="10" value="OTPVerification" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#5585C5;strokeColor=#3A5A8C;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="20" width="220" height="125" as="geometry"/>
+                </mxCell>
+                <mxCell id="110" value="PK  id : INT&#xa;     telephone : VARCHAR&#xa;     code : VARCHAR(6)&#xa;     expires_at : DATETIME&#xa;     is_used : BOOLEAN" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="10" vertex="1">
+                    <mxGeometry y="26" width="220" height="99" as="geometry"/>
+                </mxCell>
+
+                <!-- CustomUser -->
+                <mxCell id="11" value="CustomUser" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#5585C5;strokeColor=#3A5A8C;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="290" y="20" width="255" height="200" as="geometry"/>
+                </mxCell>
+                <mxCell id="111" value="PK  id : INT&#xa;     email : VARCHAR UNIQUE&#xa;     username : VARCHAR&#xa;     nom / prenom : VARCHAR&#xa;     telephone : VARCHAR&#xa;     role : ENUM(client,gestionnaire,admin)&#xa;     photo_profil : VARCHAR&#xa;     est_suspendu : BOOLEAN" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="11" vertex="1">
+                    <mxGeometry y="26" width="255" height="174" as="geometry"/>
+                </mxCell>
+
+                <!-- Notification -->
+                <mxCell id="12" value="Notification" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#D4A520;strokeColor=#A07800;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="20" width="225" height="165" as="geometry"/>
+                </mxCell>
+                <mxCell id="112" value="PK  id : INT&#xa;FK  utilisateur_id : INT&#xa;     type : VARCHAR&#xa;     titre : VARCHAR&#xa;     message : TEXT&#xa;     lu : BOOLEAN&#xa;     date_creation : DATETIME" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="12" vertex="1">
+                    <mxGeometry y="26" width="225" height="139" as="geometry"/>
+                </mxCell>
+
+                <!-- MessageContact -->
+                <mxCell id="13" value="MessageContact" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#5585C5;strokeColor=#3A5A8C;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="20" width="225" height="165" as="geometry"/>
+                </mxCell>
+                <mxCell id="113" value="PK  id : INT&#xa;     nom / email / telephone : VARCHAR&#xa;     type_profil : VARCHAR&#xa;     sujet : VARCHAR&#xa;     urgence : ENUM(normal,urgent,critique)&#xa;     message : TEXT&#xa;     lu : BOOLEAN" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="13" vertex="1">
+                    <mxGeometry y="26" width="225" height="139" as="geometry"/>
+                </mxCell>
+
+                <!-- TypeChambre -->
+                <mxCell id="20" value="TypeChambre" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#4A9440;strokeColor=#2A7020;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="260" width="225" height="220" as="geometry"/>
+                </mxCell>
+                <mxCell id="120" value="PK  id : INT&#xa;FK  hotel_id : INT&#xa;     nom : VARCHAR&#xa;     description : TEXT&#xa;     capacite : INT&#xa;     prix_nuit : DECIMAL&#xa;     prix_weekend : DECIMAL&#xa;     superficie : DECIMAL&#xa;     nombre_chambres : INT&#xa;     equipements : JSON&#xa;     est_disponible : BOOLEAN" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="20" vertex="1">
+                    <mxGeometry y="26" width="225" height="194" as="geometry"/>
+                </mxCell>
+
+                <!-- Hotel -->
+                <mxCell id="21" value="Hotel" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#3070B0;strokeColor=#1050A0;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="290" y="260" width="255" height="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="121" value="PK  id : INT&#xa;FK  gestionnaire_id : INT&#xa;     nom : VARCHAR&#xa;     description : TEXT&#xa;     ville / adresse / quartier : VARCHAR&#xa;     telephone / email : VARCHAR&#xa;     site_web : VARCHAR&#xa;     type_etablissement : VARCHAR&#xa;     type_abonnement : ENUM(freemium,pro)&#xa;     statut : ENUM&#xa;     note_moyenne : DECIMAL&#xa;     nombre_avis : INT&#xa;     taux_annulation : INT(%)&#xa;     taux_modification : INT(%)&#xa;     delai_gratuit : INT(h)&#xa;     latitude / longitude : DECIMAL&#xa;     photo_principale : VARCHAR" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="21" vertex="1">
+                    <mxGeometry y="26" width="255" height="314" as="geometry"/>
+                </mxCell>
+
+                <!-- PhotoHotel -->
+                <mxCell id="22" value="PhotoHotel" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#4A9440;strokeColor=#2A7020;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="505" width="225" height="125" as="geometry"/>
+                </mxCell>
+                <mxCell id="122" value="PK  id : INT&#xa;FK  hotel_id : INT&#xa;     image : VARCHAR&#xa;     legende : VARCHAR&#xa;     est_principale : BOOLEAN&#xa;     ordre : INT" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="22" vertex="1">
+                    <mxGeometry y="26" width="225" height="99" as="geometry"/>
+                </mxCell>
+
+                <!-- PhotoChambre -->
+                <mxCell id="23" value="PhotoChambre" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#4A9440;strokeColor=#2A7020;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="655" width="225" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="123" value="PK  id : INT&#xa;FK  type_chambre_id : INT&#xa;     image : VARCHAR&#xa;     legende : VARCHAR&#xa;     ordre : INT" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="23" vertex="1">
+                    <mxGeometry y="26" width="225" height="79" as="geometry"/>
+                </mxCell>
+
+                <!-- PlatMenu -->
+                <mxCell id="24" value="PlatMenu" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#4A9440;strokeColor=#2A7020;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="260" width="225" height="165" as="geometry"/>
+                </mxCell>
+                <mxCell id="124" value="PK  id : INT&#xa;FK  hotel_id : INT&#xa;     nom : VARCHAR&#xa;     categorie : VARCHAR&#xa;     description : TEXT&#xa;     prix : DECIMAL&#xa;     photo : VARCHAR&#xa;     est_disponible : BOOLEAN" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="24" vertex="1">
+                    <mxGeometry y="26" width="225" height="139" as="geometry"/>
+                </mxCell>
+
+                <!-- Promotion -->
+                <mxCell id="25" value="Promotion" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#4A9440;strokeColor=#2A7020;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="450" width="225" height="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="125" value="PK  id : INT&#xa;FK  type_chambre_id : INT&#xa;     titre : VARCHAR&#xa;     prix_promo : DECIMAL&#xa;     date_debut / date_fin : DATE&#xa;     est_active : BOOLEAN" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="25" vertex="1">
+                    <mxGeometry y="26" width="225" height="119" as="geometry"/>
+                </mxCell>
+
+                <!-- CommandeRestaurant -->
+                <mxCell id="26" value="CommandeRestaurant" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#4A9440;strokeColor=#2A7020;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="260" width="225" height="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="126" value="PK  id : INT&#xa;FK  hotel_id : INT&#xa;FK  client_id : INT (NULL)&#xa;     statut : ENUM&#xa;     notes : TEXT&#xa;     montant_total : DECIMAL&#xa;     date_commande : DATETIME" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="26" vertex="1">
+                    <mxGeometry y="26" width="225" height="119" as="geometry"/>
+                </mxCell>
+
+                <!-- Abonnement -->
+                <mxCell id="27" value="Abonnement" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#8060A0;strokeColor=#604080;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="840" y="430" width="225" height="165" as="geometry"/>
+                </mxCell>
+                <mxCell id="127" value="PK  id : INT&#xa;FK  hotel_id : INT&#xa;     type_abonnement : ENUM(freemium,pro)&#xa;     taux_commission : DECIMAL&#xa;     date_debut / date_fin : DATE&#xa;     statut : ENUM(actif,expire,annule)&#xa;     montant_paye : DECIMAL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="27" vertex="1">
+                    <mxGeometry y="26" width="225" height="139" as="geometry"/>
+                </mxCell>
+
+                <!-- LigneCommande -->
+                <mxCell id="28" value="LigneCommande" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#4A9440;strokeColor=#2A7020;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="1100" y="260" width="225" height="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="128" value="PK  id : INT&#xa;FK  commande_id : INT&#xa;FK  plat_id : INT (NULL)&#xa;     nom_plat : VARCHAR&#xa;     prix_unitaire : DECIMAL&#xa;     quantite : INT&#xa;     sous_total : DECIMAL" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="28" vertex="1">
+                    <mxGeometry y="26" width="225" height="119" as="geometry"/>
+                </mxCell>
+
+                <!-- DemandeUpgradePro -->
+                <mxCell id="29" value="DemandeUpgradePro" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#8060A0;strokeColor=#604080;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="1100" y="430" width="225" height="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="129" value="PK  id : INT&#xa;FK  hotel_id : INT&#xa;     statut : ENUM(en_attente,approuve,rejete)&#xa;     date_demande : DATETIME&#xa;     date_traitement : DATETIME&#xa;     message_admin : TEXT" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="29" vertex="1">
+                    <mxGeometry y="26" width="225" height="119" as="geometry"/>
+                </mxCell>
+
+                <!-- EvenementNational -->
+                <mxCell id="30" value="EvenementNational" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#D08020;strokeColor=#A06000;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="1360" y="260" width="225" height="165" as="geometry"/>
+                </mxCell>
+                <mxCell id="130" value="PK  id : INT&#xa;     nom : VARCHAR&#xa;     categorie : VARCHAR&#xa;     date_debut / date_fin : DATE&#xa;     region : VARCHAR&#xa;     villes_concernees : JSON&#xa;     est_actif : BOOLEAN" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="30" vertex="1">
+                    <mxGeometry y="26" width="225" height="139" as="geometry"/>
+                </mxCell>
+
+                <!-- MiseEnAvantHotel -->
+                <mxCell id="31" value="MiseEnAvantHotel" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#D08020;strokeColor=#A06000;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="1360" y="450" width="225" height="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="131" value="PK  id : INT&#xa;FK  hotel_id : INT&#xa;FK  evenement_id : INT (NULL)&#xa;     position_boost : INT&#xa;     date_boost_debut / fin : DATE&#xa;     est_actif : BOOLEAN" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="31" vertex="1">
+                    <mxGeometry y="26" width="225" height="119" as="geometry"/>
+                </mxCell>
+
+                <!-- Reservation -->
+                <mxCell id="40" value="Reservation" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#1090A0;strokeColor=#006080;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="290" y="635" width="255" height="255" as="geometry"/>
+                </mxCell>
+                <mxCell id="140" value="PK  id : INT&#xa;FK  client_id : INT&#xa;FK  hotel_id : INT&#xa;FK  type_chambre_id : INT&#xa;     numero : UUID UNIQUE&#xa;     nom_client / prenom_client : VARCHAR&#xa;     email_client : VARCHAR&#xa;     telephone_client : VARCHAR&#xa;     date_arrivee / date_depart : DATE&#xa;     nb_adultes / nb_enfants : INT&#xa;     prix_total : DECIMAL&#xa;     statut : ENUM&#xa;     avis_disponible : BOOLEAN" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="40" vertex="1">
+                    <mxGeometry y="26" width="255" height="229" as="geometry"/>
+                </mxCell>
+
+                <!-- Paiement -->
+                <mxCell id="41" value="Paiement" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#C0404A;strokeColor=#A02030;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="660" width="240" height="205" as="geometry"/>
+                </mxCell>
+                <mxCell id="141" value="PK  id : INT&#xa;FK  reservation_id : INT UNIQUE&#xa;     montant : DECIMAL&#xa;     montant_commission : DECIMAL&#xa;     montant_hotel : DECIMAL&#xa;     methode : ENUM(mtn,moov,celtiis,carte)&#xa;     statut : ENUM&#xa;     reference_externe : VARCHAR&#xa;     numero_telephone : VARCHAR&#xa;     date_paiement : DATETIME" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="41" vertex="1">
+                    <mxGeometry y="26" width="240" height="179" as="geometry"/>
+                </mxCell>
+
+                <!-- Commission -->
+                <mxCell id="42" value="Commission" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#8060A0;strokeColor=#604080;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="855" y="660" width="225" height="185" as="geometry"/>
+                </mxCell>
+                <mxCell id="142" value="PK  id : INT&#xa;FK  paiement_id : INT UNIQUE&#xa;     montant_brut : DECIMAL&#xa;     taux : DECIMAL&#xa;     montant_commission : DECIMAL&#xa;     montant_hotel : DECIMAL&#xa;     statut : ENUM(calcule,verse,litige)&#xa;     date_versement : DATETIME" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="42" vertex="1">
+                    <mxGeometry y="26" width="225" height="159" as="geometry"/>
+                </mxCell>
+
+                <!-- Annulation -->
+                <mxCell id="43" value="Annulation" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#C0404A;strokeColor=#A02030;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="800" width="225" height="165" as="geometry"/>
+                </mxCell>
+                <mxCell id="143" value="PK  id : INT&#xa;FK  reservation_id : INT UNIQUE&#xa;     motif : TEXT&#xa;     statut : ENUM(en_attente,approuvee,refusee)&#xa;     montant_rembourse : DECIMAL&#xa;     frais_annulation : DECIMAL&#xa;     commission_plateforme : DECIMAL&#xa;     date_traitement : DATETIME" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="43" vertex="1">
+                    <mxGeometry y="26" width="225" height="139" as="geometry"/>
+                </mxCell>
+
+                <!-- QRCodeReservation -->
+                <mxCell id="45" value="QRCodeReservation" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#C0404A;strokeColor=#A02030;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="315" y="930" width="225" height="125" as="geometry"/>
+                </mxCell>
+                <mxCell id="145" value="PK  id : INT&#xa;FK  reservation_id : INT UNIQUE&#xa;     code : UUID UNIQUE&#xa;     image : VARCHAR&#xa;     est_utilise : BOOLEAN&#xa;     date_utilisation : DATETIME" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="45" vertex="1">
+                    <mxGeometry y="26" width="225" height="99" as="geometry"/>
+                </mxCell>
+
+                <!-- Modification -->
+                <mxCell id="44" value="Modification" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#C0404A;strokeColor=#A02030;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="1000" width="255" height="205" as="geometry"/>
+                </mxCell>
+                <mxCell id="144" value="PK  id : INT&#xa;FK  reservation_id : INT UNIQUE&#xa;FK  type_chambre_ancien_id : INT&#xa;FK  type_chambre_nouveau_id : INT&#xa;     sens : ENUM(hausse,baisse,neutre)&#xa;     prix_ancien / prix_nouveau : DECIMAL&#xa;     difference : DECIMAL&#xa;     frais_modification : DECIMAL&#xa;     commission_plateforme : DECIMAL&#xa;     date_modification : DATETIME" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="44" vertex="1">
+                    <mxGeometry y="26" width="255" height="179" as="geometry"/>
+                </mxCell>
+
+                <!-- Avis -->
+                <mxCell id="50" value="Avis" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#C0404A;strokeColor=#A02030;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="580" y="910" width="225" height="165" as="geometry"/>
+                </mxCell>
+                <mxCell id="150" value="PK  id : INT&#xa;FK  client_id : INT&#xa;FK  hotel_id : INT&#xa;FK  reservation_id : INT UNIQUE&#xa;     note : INT [1..5]&#xa;     commentaire : TEXT&#xa;     est_approuve : BOOLEAN&#xa;     reponse_gestionnaire : TEXT&#xa;     date_avis : DATETIME" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="50" vertex="1">
+                    <mxGeometry y="26" width="225" height="139" as="geometry"/>
+                </mxCell>
+
+                <!-- SignalementContenu -->
+                <mxCell id="51" value="SignalementContenu" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#C0404A;strokeColor=#A02030;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="1240" width="225" height="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="151" value="PK  id : INT&#xa;FK  signaleur_id : INT&#xa;FK  avis_id : INT&#xa;     avis_initial : TEXT&#xa;     explication : TEXT&#xa;     statut : ENUM(en_attente,traite)&#xa;     date_signalement : DATETIME" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="51" vertex="1">
+                    <mxGeometry y="26" width="225" height="119" as="geometry"/>
+                </mxCell>
+
+                <!-- SignalementHotel -->
+                <mxCell id="52" value="SignalementHotel" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#C0404A;strokeColor=#A02030;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="290" y="1240" width="225" height="145" as="geometry"/>
+                </mxCell>
+                <mxCell id="152" value="PK  id : INT&#xa;FK  signaleur_id : INT&#xa;FK  hotel_id : INT&#xa;     motif : ENUM(tromperie,hygiene,securite,autre)&#xa;     description : TEXT&#xa;     statut : ENUM(en_attente,traite)&#xa;     date_signalement : DATETIME" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="52" vertex="1">
+                    <mxGeometry y="26" width="225" height="119" as="geometry"/>
+                </mxCell>
+
+                <!-- SignalementAvis -->
+                <mxCell id="53" value="SignalementAvis" style="swimlane;fontStyle=1;align=center;startSize=26;fillColor=#C0404A;strokeColor=#A02030;fontColor=#ffffff;" parent="1" vertex="1">
+                    <mxGeometry x="550" y="1240" width="225" height="125" as="geometry"/>
+                </mxCell>
+                <mxCell id="153" value="PK  id : INT&#xa;FK  signaleur_id : INT&#xa;FK  avis_id : INT&#xa;     motif : ENUM(spam,faux,inapproprie,autre)&#xa;     description : TEXT&#xa;     est_traite : BOOLEAN" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=top;spacingLeft=6;overflow=hidden;" parent="53" vertex="1">
+                    <mxGeometry y="26" width="225" height="99" as="geometry"/>
+                </mxCell>
+
+                <!-- ============================================================ -->
+                <!-- RELATIONS (notation Crow's Foot) -->
+                <!-- ============================================================ -->
+
+                <!-- CustomUser 1 ──< Notification -->
+                <mxCell id="200" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;" parent="1" source="11" target="12" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <!-- CustomUser 1 ──< Hotel (gestionnaire) -->
+                <mxCell id="201" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="11" target="21" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <!-- Hotel 1 ──< TypeChambre -->
+                <mxCell id="202" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;" parent="1" source="21" target="20" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <!-- Hotel 1 ──< PhotoHotel -->
+                <mxCell id="203" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0;exitY=0.7;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="21" target="22" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <!-- TypeChambre 1 ──< PhotoChambre -->
+                <mxCell id="204" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="20" target="23" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <!-- Hotel 1 ──< PlatMenu -->
+                <mxCell id="205" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;" parent="1" source="21" target="24" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <!-- TypeChambre 1 ──< Promotion -->
+                <mxCell id="206" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="20" target="25" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="265" y="370"/>
+                            <mxPoint x="265" y="522"/>
+                            <mxPoint x="570" y="522"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- Hotel 1 ──< CommandeRestaurant -->
+                <mxCell id="207" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;" parent="1" source="21" target="26" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <!-- CustomUser 0..1 ──< CommandeRestaurant (client facultatif) -->
+                <mxCell id="208" value="0..1   *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERzeroToOne;startFill=0;endArrow=ERmany;endFill=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="11" target="26" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="820" y="120"/>
+                            <mxPoint x="952" y="120"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- CommandeRestaurant 1 ──< LigneCommande -->
+                <mxCell id="209" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;" parent="1" source="26" target="28" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <!-- PlatMenu 0..1 ──< LigneCommande -->
+                <mxCell id="210" value="0..1   *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERzeroToOne;startFill=0;endArrow=ERmany;endFill=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="24" target="28" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1085" y="342"/>
+                            <mxPoint x="1090" y="332"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- Hotel 1 ──< Abonnement -->
+                <mxCell id="211" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=1;exitY=0.65;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="21" target="27" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="830" y="481"/>
+                            <mxPoint x="830" y="512"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- Hotel 1 ──< DemandeUpgradePro -->
+                <mxCell id="212" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="21" target="29" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="825" y="515"/>
+                            <mxPoint x="825" y="502"/>
+                            <mxPoint x="1090" y="502"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- EvenementNational 0..1 ──< MiseEnAvantHotel -->
+                <mxCell id="213" value="0..1   *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERzeroToOne;startFill=0;endArrow=ERmany;endFill=0;" parent="1" source="30" target="31" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <!-- Hotel 1 ──< MiseEnAvantHotel -->
+                <mxCell id="214" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="21" target="31" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="1340" y="430"/>
+                            <mxPoint x="1340" y="522"/>
+                            <mxPoint x="1350" y="522"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- CustomUser 1 ──< Reservation -->
+                <mxCell id="215" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="11" target="40" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="200" y="120"/>
+                            <mxPoint x="200" y="627"/>
+                            <mxPoint x="417" y="627"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- Hotel 1 ──< Reservation -->
+                <mxCell id="216" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="21" target="40" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <!-- TypeChambre 1 ──< Reservation -->
+                <mxCell id="217" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.3;entryDx=0;entryDy=0;" parent="1" source="20" target="40" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="265" y="488"/>
+                            <mxPoint x="265" y="711"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- Reservation 1 ──|o Paiement (OneToOne) -->
+                <mxCell id="218" value="1     0..1" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToOne;endFill=0;" parent="1" source="40" target="41" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <!-- Paiement 1 ──|o Commission (OneToOne) -->
+                <mxCell id="219" value="1     0..1" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToOne;endFill=0;" parent="1" source="41" target="42" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+
+                <!-- Reservation 1 ──|o Annulation (OneToOne) -->
+                <mxCell id="220" value="1     0..1" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToOne;endFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="40" target="43" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="210" y="762"/>
+                            <mxPoint x="210" y="882"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- Reservation 1 ──|o QRCodeReservation (OneToOne) -->
+                <mxCell id="221" value="1     0..1" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToOne;endFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="40" target="45" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="417" y="898"/>
+                            <mxPoint x="427" y="922"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- Reservation 1 ──|o Modification (OneToOne) -->
+                <mxCell id="222" value="1     0..1" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToOne;endFill=0;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="40" target="44" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="295" y="898"/>
+                            <mxPoint x="157" y="898"/>
+                            <mxPoint x="157" y="992"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- Reservation 1 ──|o Avis (OneToOne) -->
+                <mxCell id="223" value="1     0..1" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERzeroToOne;endFill=0;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="40" target="50" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="545" y="898"/>
+                            <mxPoint x="570" y="898"/>
+                            <mxPoint x="570" y="992"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- CustomUser 1 ──< Avis -->
+                <mxCell id="224" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" parent="1" source="11" target="50" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="180" y="120"/>
+                            <mxPoint x="180" y="992"/>
+                            <mxPoint x="570" y="992"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- Hotel 1 ──< Avis -->
+                <mxCell id="225" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.3;entryY=0;entryDx=0;entryDy=0;" parent="1" source="21" target="50" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="415" y="608"/>
+                            <mxPoint x="415" y="895"/>
+                            <mxPoint x="647" y="895"/>
+                            <mxPoint x="647" y="902"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- TypeChambre 1 ──< Modification (type_chambre_ancien) -->
+                <mxCell id="226" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;dashed=1;exitX=0;exitY=0.8;exitDx=0;exitDy=0;entryX=0;entryY=0.35;entryDx=0;entryDy=0;" parent="1" source="20" target="44" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="10" y="464"/>
+                            <mxPoint x="10" y="1071"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- Avis 1 ──< SignalementContenu -->
+                <mxCell id="227" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="50" target="51" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="580" y="1085"/>
+                            <mxPoint x="142" y="1085"/>
+                            <mxPoint x="142" y="1232"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- CustomUser 1 ──< SignalementContenu -->
+                <mxCell id="228" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" parent="1" source="11" target="51" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="-30" y="120"/>
+                            <mxPoint x="-30" y="1392"/>
+                            <mxPoint x="30" y="1392"/>
+                            <mxPoint x="30" y="1385"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- Hotel 1 ──< SignalementHotel -->
+                <mxCell id="229" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="21" target="52" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="280" y="608"/>
+                            <mxPoint x="280" y="1220"/>
+                            <mxPoint x="402" y="1220"/>
+                            <mxPoint x="402" y="1232"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- CustomUser 1 ──< SignalementHotel -->
+                <mxCell id="230" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" parent="1" source="11" target="52" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="-20" y="120"/>
+                            <mxPoint x="-20" y="1400"/>
+                            <mxPoint x="290" y="1400"/>
+                            <mxPoint x="290" y="1385"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- Avis 1 ──< SignalementAvis -->
+                <mxCell id="231" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=1;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="50" target="53" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="805" y="1085"/>
+                            <mxPoint x="662" y="1085"/>
+                            <mxPoint x="662" y="1232"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+                <!-- CustomUser 1 ──< SignalementAvis -->
+                <mxCell id="232" value="1     *" style="edgeStyle=orthogonalEdgeStyle;startArrow=ERmandOne;startFill=0;endArrow=ERmany;endFill=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=1;entryDx=0;entryDy=0;" parent="1" source="11" target="53" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="-10" y="120"/>
+                            <mxPoint x="-10" y="1410"/>
+                            <mxPoint x="550" y="1410"/>
+                            <mxPoint x="550" y="1365"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

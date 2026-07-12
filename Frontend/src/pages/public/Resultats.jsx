@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
-import { Search, MapPin, SlidersHorizontal, Grid3X3, List, X, Star, ChevronDown, Filter, Loader2, Navigation, Landmark, TreePine, Church, Sword } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Search, MapPin, Grid3X3, List, X, Star, Filter, Loader2, Navigation, Landmark, TreePine, Church, Sword } from 'lucide-react'
 import Layout from '../../components/common/Layout'
 import CarteHotel from '../../components/common/CarteHotel'
 import api from '../../services/api'
@@ -34,16 +34,19 @@ const VILLES_BENIN = [
 
 export default function Resultats() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const navigate = useNavigate()
 
   const [ville, setVille] = useState(searchParams.get('ville') || '')
   const [dateArrivee, setDateArrivee] = useState(searchParams.get('arrivee') || '')
   const [dateDepart, setDateDepart] = useState(searchParams.get('depart') || '')
-  const [voyageurs] = useState(searchParams.get('voyageurs') || 1)
+  const [voyageurs, setVoyageurs] = useState(Math.max(1, parseInt(searchParams.get('voyageurs')) || 1))
   const [tri, setTri] = useState('popularite')
   const [vueGrille, setVueGrille] = useState(true)
   const [filtresOuverts, setFiltresOuverts] = useState(false)
-  const [filtres, setFiltres] = useState({ equipements: [], type: '', etoilesMin: 0, restauration: false, prixMax: 0, nbPersonnes: 0 })
+  const [filtres, setFiltres] = useState({
+    equipements: [], type: '', etoilesMin: 0, restauration: false, prixMax: 0,
+    // Le nombre de voyageurs choisi sur l'accueil filtre réellement dès l'arrivée sur cette page.
+    nbPersonnes: Math.min(Math.max(1, parseInt(searchParams.get('voyageurs')) || 1), 6),
+  })
   const [hotels, setHotels] = useState([])
   const [evenements, setEvenements] = useState([])
   const [chargement, setChargement] = useState(true)
@@ -271,6 +274,12 @@ export default function Resultats() {
               <input type="date" value={dateDepart} onChange={e => setDateDepart(e.target.value)}
                 className="bg-transparent text-sm text-gray-700 outline-none w-full" placeholder="Départ" />
             </div>
+            <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-2.5 sm:w-36">
+              <input type="number" value={voyageurs} min={1} max={20}
+                onChange={(e) => setVoyageurs(Math.max(1, parseInt(e.target.value) || 1))}
+                className="bg-transparent text-sm text-gray-700 outline-none w-full" />
+              <span className="text-xs text-gray-400 shrink-0">voyageur{voyageurs > 1 ? 's' : ''}</span>
+            </div>
             <button
               onClick={() => {
                 const p = new URLSearchParams()
@@ -279,6 +288,8 @@ export default function Resultats() {
                 if (dateDepart) p.set('depart', dateDepart)
                 p.set('voyageurs', voyageurs)
                 setSearchParams(p)
+                // Applique réellement le filtre de capacité (sans écraser les autres filtres actifs).
+                setFiltres(prev => ({ ...prev, nbPersonnes: Math.min(voyageurs, 6) }))
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-colors">
               <Search size={16} />
