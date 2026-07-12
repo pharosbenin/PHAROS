@@ -7,9 +7,10 @@ import usePolling from '../../hooks/usePolling'
 
 export default function DashboardAdmin() {
   const navigate = useNavigate()
-  const [periode, setPeriode] = useState('mois')
+  const [periode, setPeriode] = useState('année')
   const [chargement, setChargement] = useState(true)
   const [stats, setStats] = useState({ hotels: [], users: [], commissions: null, reservations: [] })
+  const [derniereMaj, setDerniereMaj] = useState(null)
 
   const charger = () => {
     Promise.all([
@@ -25,12 +26,15 @@ export default function DashboardAdmin() {
           commissions: cRes.data,
           reservations: rRes.data,
         })
+        setDerniereMaj(new Date())
       })
       .catch(console.error)
       .finally(() => setChargement(false))
   }
 
-  usePolling(charger, 30000)
+  // Rafraîchissement automatique toutes les 15s (pause quand l'onglet est en arrière-plan) :
+  // une nouvelle réservation payée fait donc apparaître sa commission ici sans action de l'admin.
+  usePolling(charger, 15000)
 
   const hotels = stats.hotels || []
   const users = stats.users || []
@@ -49,19 +53,88 @@ export default function DashboardAdmin() {
     { label: 'Réservations totales', valeur: reservations.length, icon: BookOpen, couleur: 'text-amber-600', bg: 'bg-amber-50' },
   ]
 
-  // Revenus mensuels depuis les commissions
-  const revenusMois = (() => {
-    const map = {}
+  // Revenus par période sélectionnée : semaine = 7 derniers jours, mois = jours du mois en cours,
+  // année = 12 mois de l'année en cours (les commissions d'autres années ne sont plus mélangées).
+  const maintenant = new Date()
+  const commissionsData = commissions.commissions || []
+
+  const revenusPeriode = (() => {
+    if (periode === 'semaine') {
+      const labelsJours = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+      const jours = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date(maintenant)
+        d.setDate(d.getDate() - (6 - i))
+        return d
+      })
+      return jours.map(d => ({
+        label: labelsJours[d.getDay()],
+        montant: commissionsData
+          .filter(c => new Date(c.date_calcul).toDateString() === d.toDateString())
+          .reduce((s, c) => s + Number(c.montant_commission), 0),
+      }))
+    }
+
+    if (periode === 'mois') {
+      const annee = maintenant.getFullYear()
+      const moisIdx = maintenant.getMonth()
+      const nbJours = new Date(annee, moisIdx + 1, 0).getDate()
+      return Array.from({ length: nbJours }, (_, i) => i + 1).map(jour => ({
+        label: String(jour),
+        montant: commissionsData
+          .filter(c => {
+            const cd = new Date(c.date_calcul)
+            return cd.getFullYear() === annee && cd.getMonth() === moisIdx && cd.getDate() === jour
+          })
+          .reduce((s, c) => s + Number(c.montant_commission), 0),
+      }))
+    }
+
+    // année : 12 mois de l'année en cours uniquement
+    const annee = maintenant.getFullYear()
     const moisLabels = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
-    ;(commissions.commissions || []).forEach(c => {
-      const d = new Date(c.date_calcul)
-      const key = d.getMonth()
-      map[key] = (map[key] || 0) + Number(c.montant_commission)
+    const map = {}
+    commissionsData.forEach(c => {
+      const cd = new Date(c.date_calcul)
+      if (cd.getFullYear() === annee) map[cd.getMonth()] = (map[cd.getMonth()] || 0) + Number(c.montant_commission)
     })
-    return moisLabels.map((mois, i) => ({ mois, montant: map[i] || 0 }))
+    return moisLabels.map((label, i) => ({ label, montant: map[i] || 0 }))
   })()
 
-  const maxRevenu = Math.max(...revenusMois.map(r => r.montant), 1)
+  // Arrondit le maximum à une valeur "ronde" (1/2/5 × 10^n) pour des graduations lisibles sur l'axe vertical.
+  const arrondirEchelle = (valeur) => {
+    if (valeur <= 0) return 1
+    const exposant = Math.floor(Math.log10(valeur))
+    const base = Math.pow(10, exposant)
+    const norme = valeur / base
+    const normeRonde = norme <= 1 ? 1 : norme <= 2 ? 2 : norme <= 5 ? 5 : 10
+    return normeRonde * base
+  }
+
+  const maxRevenu = Math.max(...revenusPeriode.map(r => r.montant), 1)
+  const plafondEchelle = arrondirEchelle(maxRevenu)
+  const NB_GRADUATIONS = 4
+  const graduationsY = Array.from({ length: NB_GRADUATIONS + 1 }, (_, i) => plafondEchelle * (1 - i / NB_GRADUATIONS))
+  const formatFCFA = (v) => v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : `${Math.round(v)}`
+
+  // Hauteur max de la barre en pixels : un % CSS ne fonctionne pas ici car le parent flex
+  // (colonne) n'a pas de hauteur définie — on calcule donc directement en pixels.
+  const BAR_MAX_PX = 144
+
+  // Valeur réelle (non arrondie) de chaque barre non nulle, positionnée sur l'axe Y en vert,
+  // pour lire la hauteur exacte d'une barre (ex: 135k) même quand elle tombe entre deux graduations.
+  const marqueursValeursReelles = [...new Set(revenusPeriode.filter(r => r.montant > 0).map(r => r.montant))]
+    .map(montant => ({ montant, topPx: BAR_MAX_PX - (montant / plafondEchelle) * BAR_MAX_PX }))
+
+  // Une graduation ronde trop proche d'une valeur réelle (en pixels) est masquée pour éviter
+  // que les deux libellés (ex: "150k" et "134.8k") ne se chevauchent visuellement.
+  const SEUIL_COLLISION_PX = 12
+  const graduationMasquee = (topPxGraduation) =>
+    marqueursValeursReelles.some(m => Math.abs(m.topPx - topPxGraduation) < SEUIL_COLLISION_PX)
+  const titrePeriode = periode === 'semaine'
+    ? 'Revenus des 7 derniers jours'
+    : periode === 'mois'
+      ? `Revenus quotidiens — ${maintenant.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`
+      : `Revenus mensuels ${maintenant.getFullYear()}`
 
   const hotelsProCount = hotels.filter(h => h.type_abonnement === 'pro').length
   const hotelsFreemiumCount = hotels.filter(h => h.type_abonnement === 'freemium').length
@@ -123,25 +196,85 @@ export default function DashboardAdmin() {
           {/* Graphique revenus */}
           <div className="xl:col-span-2 bg-white rounded-2xl border border-gray-100 p-6">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="font-bold text-gray-900">Revenus mensuels (commissions)</h2>
-              <span className="text-xs text-gray-400">En FCFA</span>
+              <h2 className="font-bold text-gray-900 capitalize">{titrePeriode} (commissions)</h2>
+              <div className="flex items-center gap-3">
+                {derniereMaj && (
+                  <span className="flex items-center gap-1.5 text-[11px] text-gray-400">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                    Mis à jour à {derniereMaj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                )}
+                <span className="text-xs text-gray-400">En FCFA</span>
+              </div>
             </div>
-            {revenusMois.every(r => r.montant === 0) ? (
+            {revenusPeriode.every(r => r.montant === 0) ? (
               <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Aucune donnée disponible</div>
             ) : (
-              <div className="flex items-end gap-3 h-40">
-                {revenusMois.map((r, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                    {r.montant > 0 && (
-                      <span className="text-xs text-gray-400 hidden sm:block">{(r.montant / 1000).toFixed(0)}k</span>
-                    )}
-                    <div
-                      className={`w-full rounded-t-lg transition-all ${r.montant > 0 ? 'bg-blue-600' : 'bg-blue-100'}`}
-                      style={{ height: `${Math.max((r.montant / maxRevenu) * 100, 4)}%` }}
-                    />
-                    <span className="text-xs font-medium text-gray-500">{r.mois}</span>
+              <div className="flex">
+                {/* Axe vertical : graduations arrondies + valeurs réelles des barres (tout en vert) */}
+                <div className="relative text-[10px] text-green-600 font-semibold text-right pr-2 h-36 w-12 shrink-0">
+                  {graduationsY.map((v, i) => {
+                    const topPx = (i / NB_GRADUATIONS) * BAR_MAX_PX
+                    if (graduationMasquee(topPx)) return null
+                    return (
+                      <span key={i} className="absolute right-2 -translate-y-1/2 leading-none" style={{ top: `${topPx}px` }}>
+                        {formatFCFA(v)}
+                      </span>
+                    )
+                  })}
+                  {marqueursValeursReelles.map((m, i) => (
+                    <span
+                      key={`reel-${i}`}
+                      className="absolute right-2 -translate-y-1/2 text-green-700 font-extrabold leading-none bg-white px-0.5"
+                      style={{ top: `${m.topPx}px` }}
+                    >
+                      {formatFCFA(m.montant)}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  {/* Zone de tracé : quadrillage horizontal + axes + barres */}
+                  <div className="relative h-36 border-l border-b border-gray-200">
+                    <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+                      {graduationsY.map((_, i) => (
+                        <div key={i} className="border-t border-gray-100 w-full first:border-transparent" />
+                      ))}
+                    </div>
+                    {/* Lignes pointillées vertes : relient chaque valeur réelle à sa position exacte sur l'axe */}
+                    <div className="absolute inset-0 pointer-events-none">
+                      {marqueursValeursReelles.map((m, i) => (
+                        <div key={i} className="absolute left-0 right-0 border-t border-dashed border-green-400" style={{ top: `${m.topPx}px` }} />
+                      ))}
+                    </div>
+                    <div className={`relative flex items-end h-full pl-1.5 ${periode === 'mois' ? 'gap-0.5' : 'gap-3'}`}>
+                      {revenusPeriode.map((r, i) => {
+                        const hauteurBarre = (r.montant / plafondEchelle) * BAR_MAX_PX
+                        return (
+                          <div key={i} className="flex-1 flex flex-col justify-end items-center min-w-0 h-full">
+                            <div
+                              className={`w-full rounded-t-md transition-all ${r.montant > 0 ? 'bg-blue-600' : 'bg-blue-100'}`}
+                              style={{ height: `${Math.max(hauteurBarre, r.montant > 0 ? 2 : 0)}px` }}
+                              title={`${r.label} : ${Number(r.montant).toLocaleString()} FCFA`}
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
                   </div>
-                ))}
+
+                  {/* Axe horizontal : libellés (jours/mois) */}
+                  <div className={`flex pl-1.5 mt-1.5 ${periode === 'mois' ? 'gap-0.5' : 'gap-3'}`}>
+                    {revenusPeriode.map((r, i) => {
+                      const afficherLabel = periode !== 'mois' || i % 5 === 0 || i === revenusPeriode.length - 1
+                      return (
+                        <div key={i} className="flex-1 text-center min-w-0">
+                          <span className="text-[10px] font-medium text-gray-500">{afficherLabel ? r.label : ''}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
               </div>
             )}
           </div>

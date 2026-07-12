@@ -1,5 +1,11 @@
+from django.db.models import Q
 from rest_framework import serializers
+from reservations.models import Reservation
 from .models import Avis, SignalementAvis, SignalementContenu, SignalementHotel
+
+# Statuts qui ferment la fenêtre de signalement d'un hôtel : réservation pas encore payée,
+# ou déjà terminée/annulée/remboursée — il ne reste alors plus de séjour "en cours" à signaler.
+STATUTS_NON_SIGNALABLES = ('en_attente', 'terminee', 'annulee', 'remboursee')
 
 
 def _est_proprietaire(reservation, user):
@@ -8,6 +14,14 @@ def _est_proprietaire(reservation, user):
     if reservation.client is not None:
         return reservation.client == user
     return reservation.email_client.lower() == user.email.lower()
+
+
+def _a_reservation_active(hotel, user):
+    """Vérifie que l'utilisateur a une réservation active (payée, pas encore terminée ni annulée) dans cet hôtel."""
+    return Reservation.objects.filter(
+        Q(client=user) | Q(client__isnull=True, email_client__iexact=user.email),
+        hotel=hotel,
+    ).exclude(statut__in=STATUTS_NON_SIGNALABLES).exists()
 
 
 class AvisSerializer(serializers.ModelSerializer):
@@ -30,17 +44,17 @@ class AvisCreerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Avis
         fields = ('hotel', 'reservation', 'note', 'commentaire')
+        extra_kwargs = {'reservation': {'required': True, 'allow_null': False}}
 
     def validate(self, attrs):
         request = self.context['request']
-        reservation = attrs.get('reservation')
-        if reservation:
-            if reservation.hotel != attrs['hotel']:
-                raise serializers.ValidationError({'reservation': "Cette réservation ne correspond pas à cet hôtel."})
-            if not _est_proprietaire(reservation, request.user):
-                raise serializers.ValidationError({'reservation': "Cette réservation ne vous appartient pas."})
-            if reservation.statut != 'terminee':
-                raise serializers.ValidationError({'reservation': "Vous ne pouvez laisser un avis qu'après votre séjour."})
+        reservation = attrs['reservation']
+        if reservation.hotel != attrs['hotel']:
+            raise serializers.ValidationError({'reservation': "Cette réservation ne correspond pas à cet hôtel."})
+        if not _est_proprietaire(reservation, request.user):
+            raise serializers.ValidationError({'reservation': "Cette réservation ne vous appartient pas."})
+        if reservation.statut != 'terminee':
+            raise serializers.ValidationError({'reservation': "Vous ne pouvez laisser un avis qu'après votre séjour."})
         if Avis.objects.filter(client=request.user, hotel=attrs['hotel'], reservation=reservation).exists():
             raise serializers.ValidationError("Vous avez déjà laissé un avis pour cet hôtel.")
         return attrs
@@ -88,6 +102,13 @@ class SignalementHotelSerializer(serializers.ModelSerializer):
     class Meta:
         model = SignalementHotel
         fields = ('hotel', 'motif', 'description')
+
+    def validate_hotel(self, hotel):
+        if not _a_reservation_active(hotel, self.context['request'].user):
+            raise serializers.ValidationError(
+                "Vous ne pouvez signaler que l'établissement d'une réservation en cours (payée et pas encore terminée)."
+            )
+        return hotel
 
     def create(self, validated_data):
         validated_data['client'] = self.context['request'].user

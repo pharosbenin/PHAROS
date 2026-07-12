@@ -173,9 +173,30 @@ export default function DetailEtablissement() {
   const [signalDescription, setSignalDescription] = useState('')
   const [signalEnvoi, setSignalEnvoi] = useState(false)
   const [signalOk, setSignalOk] = useState(false)
+  const [signalErreur, setSignalErreur] = useState('')
   // IDs des chambres disponibles pour les dates sélectionnées (null = pas encore filtré)
   const [chambresDispoIds, setChambresDispoIds] = useState(null)
   const [chambreDetail, setChambreDetail] = useState(null)
+  // Le client a-t-il une réservation active (payée, ni terminée ni annulée) sur CET hôtel ?
+  const [reservationActiveIci, setReservationActiveIci] = useState(false)
+
+  // Le bouton "Signaler" n'a de sens que pendant la fenêtre d'une réservation en cours sur cet
+  // hôtel précis : pas avant paiement, plus après séjour terminé/annulé (→ l'avis prend le relais).
+  const STATUTS_NON_SIGNALABLES = ['en_attente', 'terminee', 'annulee', 'remboursee']
+  useEffect(() => {
+    if (!user || user.role !== 'client' || !id) { setReservationActiveIci(false); return }
+    let annule = false
+    api.get('/client/reservations/')
+      .then(res => {
+        if (annule) return
+        const active = (res.data || []).some(r =>
+          String(r.hotel_id) === String(id) && !STATUTS_NON_SIGNALABLES.includes(r.statut)
+        )
+        setReservationActiveIci(active)
+      })
+      .catch(() => setReservationActiveIci(false))
+    return () => { annule = true }
+  }, [user, id])
 
   useEffect(() => {
     async function charger() {
@@ -258,10 +279,15 @@ export default function DetailEtablissement() {
   const soumettrSignalement = async () => {
     if (!signalMotif || !signalDescription.trim()) return
     setSignalEnvoi(true)
+    setSignalErreur('')
     try {
       await api.post('/signalements/hotel/', { hotel: hotel.id, motif: signalMotif, description: signalDescription })
       setSignalOk(true); setSignalModalOuvert(false)
-    } catch { /* silencieux */ } finally { setSignalEnvoi(false) }
+    } catch (err) {
+      const data = err.response?.data
+      const msg = data?.hotel?.[0] || data?.detail || Object.values(data || {})[0] || "Impossible d'envoyer ce signalement."
+      setSignalErreur(typeof msg === 'string' ? msg : "Impossible d'envoyer ce signalement.")
+    } finally { setSignalEnvoi(false) }
   }
 
   return (
@@ -279,6 +305,7 @@ export default function DetailEtablissement() {
               <button onClick={() => setSignalModalOuvert(false)} className="text-gray-400 hover:text-gray-600">✕</button>
             </div>
             <p className="text-xs text-gray-400 mb-4">Votre signalement sera transmis à notre équipe de modération. Il ne sera pas visible publiquement.</p>
+            {signalErreur && <p className="text-xs text-red-500 mb-3 bg-red-50 rounded-lg px-3 py-2">{signalErreur}</p>}
             <div className="mb-3">
               <label className="text-xs font-semibold text-gray-600 mb-1 block">Motif</label>
               <select value={signalMotif} onChange={e => setSignalMotif(e.target.value)}
@@ -615,8 +642,9 @@ export default function DetailEtablissement() {
                   </div>
                 ))}
 
-                {/* Bouton signaler l'hôtel */}
-                {user?.role === 'client' && (
+                {/* Bouton signaler l'hôtel : visible uniquement si le client a une réservation
+                    active (payée, pas encore terminée/annulée) sur cet hôtel précis. */}
+                {user?.role === 'client' && reservationActiveIci && (
                   <div className="pt-2 border-t border-gray-100">
                     {signalOk ? (
                       <p className="text-xs text-green-600 flex items-center gap-1.5">
@@ -624,7 +652,7 @@ export default function DetailEtablissement() {
                       </p>
                     ) : (
                       <button onClick={() => setSignalModalOuvert(true)}
-                        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-red-500 transition-colors">
+                        className="flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition-colors">
                         <AlertCircle size={13} /> Signaler cet établissement
                       </button>
                     )}
