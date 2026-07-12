@@ -1,4 +1,3 @@
-import uuid
 from decimal import Decimal
 from django.utils import timezone
 from rest_framework import status, generics
@@ -124,6 +123,45 @@ def detail_reservation(request, numero):
 
 # --- Paiement ---
 
+def _taux_commission(hotel):
+    from commissions.models import Abonnement as AbonnementModel
+    abonnement_actif = AbonnementModel.objects.filter(
+        hotel=hotel, statut='actif'
+    ).order_by('-date_creation').first()
+    if abonnement_actif:
+        return abonnement_actif.taux_commission
+    return Decimal('0.05') if hotel.type_abonnement == 'pro' else Decimal('0.03')
+
+
+def _finaliser_paiement_reussi(reservation, paiement):
+    """Passe la réservation à payee, génère le QR code et enregistre la commission."""
+    hotel = reservation.hotel
+    taux = _taux_commission(hotel)
+
+    paiement.statut = 'reussi'
+    paiement.date_paiement = timezone.now()
+    paiement.save(update_fields=['statut', 'date_paiement'])
+
+    reservation.statut = 'payee'
+    reservation.save(update_fields=['statut'])
+
+    _recompute_disponibilite(reservation.type_chambre)
+    QRCodeReservation.objects.get_or_create(reservation=reservation)
+
+    from commissions.models import Commission
+    Commission.objects.get_or_create(
+        paiement=paiement,
+        defaults={
+            'hotel': hotel,
+            'montant_brut': paiement.montant,
+            'taux': taux,
+            'montant_commission': paiement.montant_commission,
+            'montant_hotel': paiement.montant_hotel,
+            'statut': 'calcule',
+        }
+    )
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def initier_paiement(request, numero):
@@ -137,20 +175,25 @@ def initier_paiement(request, numero):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     hotel = reservation.hotel
-    from commissions.models import Abonnement as AbonnementModel
-    abonnement_actif = AbonnementModel.objects.filter(
-        hotel=hotel, statut='actif'
-    ).order_by('-date_creation').first()
-    if abonnement_actif:
-        taux = abonnement_actif.taux_commission
-    else:
-        taux = Decimal('0.05') if hotel.type_abonnement == 'pro' else Decimal('0.03')
+    taux = _taux_commission(hotel)
     montant = reservation.prix_total
     montant_commission = round(montant * taux, 2)
     montant_hotel = round(montant - montant_commission, 2)
 
-    # Simuler le paiement (intégration FedaPay/Kkiapay à faire)
-    paiement, _ = Paiement.objects.update_or_create(
+    from .fedapay import creer_transaction, FedaPayError
+    try:
+        transaction_id, payment_url = creer_transaction(
+            montant=montant,
+            description=f'Réservation {reservation.hotel.nom} — {reservation.numero}',
+            reservation_numero=reservation.numero,
+            prenom=reservation.prenom_client,
+            nom=reservation.nom_client,
+            email=reservation.email_client,
+        )
+    except FedaPayError as e:
+        return Response({'detail': f"Impossible de contacter FedaPay : {e}"}, status=status.HTTP_502_BAD_GATEWAY)
+
+    Paiement.objects.update_or_create(
         reservation=reservation,
         defaults={
             'montant': montant,
@@ -158,44 +201,59 @@ def initier_paiement(request, numero):
             'montant_hotel': montant_hotel,
             'methode': serializer.validated_data['methode'],
             'numero_telephone': serializer.validated_data.get('numero_telephone', ''),
-            'statut': 'reussi',
-            'reference_externe': str(uuid.uuid4()),
-            'date_paiement': timezone.now(),
+            'statut': 'en_attente',
+            'reference_externe': transaction_id,
+            'date_paiement': None,
         }
     )
-
-    reservation.statut = 'payee'
-    reservation.save(update_fields=['statut'])
-
-    # Mettre à jour la disponibilité de la chambre
-    _recompute_disponibilite(reservation.type_chambre)
-
-    # Générer QR code
-    QRCodeReservation.objects.get_or_create(reservation=reservation)
-
-    # Enregistrer commission
-    from commissions.models import Commission
-    Commission.objects.get_or_create(
-        paiement=paiement,
-        defaults={
-            'hotel': hotel,
-            'montant_brut': montant,
-            'taux': taux,
-            'montant_commission': montant_commission,
-            'montant_hotel': montant_hotel,
-            'statut': 'calcule',
-        }
-    )
-
-    # Générer un transaction_id FedaPay-like pour la simulation
-    transaction_id = 'FDP-' + paiement.reference_externe[:8].upper()
 
     return Response({
-        'message': 'Paiement effectué avec succès.',
+        'message': 'Transaction créée, redirection vers FedaPay requise.',
         'transaction_id': transaction_id,
-        'simulation': True,
-        'reservation': ReservationDetailSerializer(reservation).data,
+        'payment_url': payment_url,
     })
+
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def verifier_paiement(request, numero):
+    try:
+        reservation = Reservation.objects.get(numero=numero)
+    except Reservation.DoesNotExist:
+        return Response({'detail': 'Réservation introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+    try:
+        paiement = reservation.paiement
+    except Paiement.DoesNotExist:
+        return Response({'detail': 'Aucun paiement initié pour cette réservation.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if paiement.statut == 'reussi':
+        return Response({
+            'statut': 'reussi',
+            'transaction_id': paiement.reference_externe,
+            'reservation': ReservationDetailSerializer(reservation).data,
+        })
+
+    from .fedapay import statut_transaction, FedaPayError
+    try:
+        statut_fedapay = statut_transaction(paiement.reference_externe)
+    except FedaPayError as e:
+        return Response({'detail': f"Impossible de vérifier le paiement : {e}"}, status=status.HTTP_502_BAD_GATEWAY)
+
+    if statut_fedapay == 'approved':
+        _finaliser_paiement_reussi(reservation, paiement)
+        return Response({
+            'statut': 'reussi',
+            'transaction_id': paiement.reference_externe,
+            'reservation': ReservationDetailSerializer(reservation).data,
+        })
+
+    if statut_fedapay in ('declined', 'canceled'):
+        paiement.statut = 'echoue'
+        paiement.save(update_fields=['statut'])
+        return Response({'statut': 'echoue'})
+
+    return Response({'statut': 'en_attente'})
 
 
 @api_view(['GET'])

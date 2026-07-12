@@ -1,47 +1,40 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { ChevronLeft, Check, Loader2, Lock, Info, Shield, Zap } from 'lucide-react'
+import { ChevronLeft, Check, Loader2, Info, Shield, Zap } from 'lucide-react'
 import Layout from '../../components/common/Layout'
 import api from '../../services/api'
+import logoMtn from '../../assets/paiements/mtn.svg'
+import logoMoov from '../../assets/paiements/moov.png'
+import logoCeltiis from '../../assets/paiements/celtiis.svg'
+import logoVisa from '../../assets/paiements/visa.svg'
+import logoMastercard from '../../assets/paiements/mastercard.svg'
 
 const METHODES = [
   {
     id: 'mtn',
     label: 'MTN Mobile Money',
-    couleur: 'bg-yellow-400',
-    textColor: 'text-yellow-900',
-    logo: 'MTN',
-    iconBg: 'bg-yellow-50 border-yellow-200',
+    logos: [logoMtn],
     selectedBg: 'border-yellow-500 bg-yellow-50',
     type: 'mobile',
   },
   {
     id: 'moov',
     label: 'Moov Money',
-    couleur: 'bg-blue-600',
-    textColor: 'text-white',
-    logo: 'MOOV',
-    iconBg: 'bg-blue-50 border-blue-200',
+    logos: [logoMoov],
     selectedBg: 'border-blue-500 bg-blue-50',
     type: 'mobile',
   },
   {
     id: 'celtiis',
     label: 'Celtiis Money',
-    couleur: 'bg-green-600',
-    textColor: 'text-white',
-    logo: 'CEL',
-    iconBg: 'bg-green-50 border-green-200',
+    logos: [logoCeltiis],
     selectedBg: 'border-green-500 bg-green-50',
     type: 'mobile',
   },
   {
     id: 'carte',
     label: 'Carte bancaire',
-    couleur: 'bg-gray-800',
-    textColor: 'text-white',
-    logo: '💳',
-    iconBg: 'bg-gray-50 border-gray-200',
+    logos: [logoVisa, logoMastercard],
     selectedBg: 'border-gray-500 bg-gray-50',
     type: 'carte',
   },
@@ -51,13 +44,8 @@ export default function Paiement() {
   const navigate = useNavigate()
   const { state } = useLocation()
   const [methode, setMethode] = useState('mtn')
-  const [telephone, setTelephone] = useState('')
-  const [carte, setCarte] = useState({ numero: '', expiry: '', cvv: '', titulaire: '' })
-  const [etape, setEtape] = useState('saisie') // saisie | attente | succes
+  const [etape, setEtape] = useState('saisie') // saisie | redirection
   const [erreur, setErreur] = useState('')
-  const [transactionId, setTransactionId] = useState('')
-  const [secondes, setSecondes] = useState(4)
-  const timerRef = useRef(null)
 
   const reservationNumero = state?.reservationNumero
   const reservationData = state || {
@@ -76,21 +64,6 @@ export default function Paiement() {
   const commission = Math.round(total * taux / 100)
   const escrow = total - commission
   const methodeActive = METHODES.find(m => m.id === methode)
-  const estCarte = methodeActive?.type === 'carte'
-
-  // Compte à rebours sur l'écran d'attente
-  useEffect(() => {
-    if (etape === 'attente') {
-      setSecondes(4)
-      timerRef.current = setInterval(() => {
-        setSecondes(prev => {
-          if (prev <= 1) { clearInterval(timerRef.current); return 0 }
-          return prev - 1
-        })
-      }, 1000)
-    }
-    return () => clearInterval(timerRef.current)
-  }, [etape])
 
   const validerPaiement = async (e) => {
     e.preventDefault()
@@ -98,41 +71,14 @@ export default function Paiement() {
       setErreur('Numéro de réservation manquant. Recommencez la réservation.')
       return
     }
-    if (estCarte) {
-      const num = carte.numero.replace(/\s/g, '')
-      if (num.length !== 16) { setErreur('Numéro de carte invalide (16 chiffres requis).'); return }
-      if (!carte.expiry.match(/^\d{2}\/\d{2}$/)) { setErreur('Date d\'expiration invalide (MM/AA).'); return }
-      if (carte.cvv.length !== 3) { setErreur('CVV invalide (3 chiffres requis).'); return }
-      if (!carte.titulaire.trim()) { setErreur('Nom du titulaire requis.'); return }
-    } else {
-      if (!telephone || telephone.length !== 10 || !telephone.startsWith('01')) {
-        setErreur('Numéro invalide. 10 chiffres requis, commençant par 01.')
-        return
-      }
-    }
 
     setErreur('')
-    setEtape('attente')
+    setEtape('redirection')
 
     try {
-      const payload = estCarte
-        ? { methode, numero_telephone: '' }
-        : { methode, numero_telephone: `+229${telephone}` }
-      const [res] = await Promise.all([
-        api.post(`/reservations/${reservationNumero}/paiement/`, payload),
-        new Promise(resolve => setTimeout(resolve, 4000)),
-      ])
-      setTransactionId(res.data.transaction_id || 'FDP-' + Math.random().toString(36).substring(2, 10).toUpperCase())
-      setEtape('succes')
-      setTimeout(() => {
-        navigate(`/confirmation/${reservationNumero}`, {
-          state: {
-            reservation: res.data.reservation,
-            methodeLabel: methodeActive?.label,
-            transactionId: res.data.transaction_id,
-          }
-        })
-      }, 2000)
+      const res = await api.post(`/reservations/${reservationNumero}/paiement/`, { methode })
+      // Redirection réelle vers la page de paiement hébergée FedaPay (sandbox)
+      window.location.href = res.data.payment_url
     } catch (err) {
       setEtape('saisie')
       const data = err.response?.data
@@ -187,8 +133,10 @@ export default function Paiement() {
                   {METHODES.map(m => (
                     <button key={m.id} type="button" onClick={() => { setMethode(m.id); setErreur('') }}
                       className={`px-3 py-2 rounded-lg border-2 transition-all duration-200 text-left flex flex-row items-center gap-2.5 shadow-md hover:shadow-xl hover:-translate-y-1 transform ${methode === m.id ? m.selectedBg + ' scale-[1.03]' : 'border-gray-200 bg-white hover:border-gray-300'}`}>
-                      <div className={`w-6 h-6 ${m.couleur} rounded-md flex items-center justify-center shrink-0`}>
-                        <span className={`text-[10px] font-black ${m.textColor}`}>{m.logo}</span>
+                      <div className="w-9 h-9 bg-white border border-gray-200 rounded-md flex items-center justify-center shrink-0 gap-0.5 p-1">
+                        {m.logos.map((src, i) => (
+                          <img key={i} src={src} alt="" className="max-w-full max-h-full object-contain" />
+                        ))}
                       </div>
                       <div className="min-w-0">
                         <p className="font-bold text-xs text-gray-800 leading-tight truncate">{m.label}</p>
@@ -203,125 +151,34 @@ export default function Paiement() {
                   ))}
                 </div>
 
-                {/* Champs Mobile Money */}
-                {!estCarte && (
-                  <>
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Numéro de téléphone</p>
-                    <div className="flex items-center gap-2 border border-gray-200 rounded-xl px-4 py-3 focus-within:border-[#FF6B2B] transition-colors mb-2">
-                      <span className="text-gray-500 text-sm font-semibold">+229</span>
-                      <div className="w-px h-5 bg-gray-200" />
-                      <input type="tel" value={telephone}
-                        onChange={e => setTelephone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                        placeholder="01XXXXXXXX" className="flex-1 text-sm text-gray-800 outline-none" />
-                    </div>
-                    <p className="text-xs text-gray-400 mb-5">
-                      Vous recevrez une confirmation {methodeActive?.label} pour valider le paiement.
-                    </p>
-                  </>
-                )}
-
-                {/* Champs Carte bancaire */}
-                {estCarte && (
-                  <div className="space-y-3 mb-5">
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Numéro de carte</p>
-                      <input
-                        type="text" inputMode="numeric"
-                        value={carte.numero}
-                        onChange={e => {
-                          const v = e.target.value.replace(/\D/g, '').slice(0, 16)
-                          setCarte(p => ({ ...p, numero: v.replace(/(.{4})/g, '$1 ').trim() }))
-                        }}
-                        placeholder="0000 0000 0000 0000"
-                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:border-[#FF6B2B] tracking-widest font-mono"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Expiration</p>
-                        <input
-                          type="text" inputMode="numeric"
-                          value={carte.expiry}
-                          onChange={e => {
-                            let v = e.target.value.replace(/\D/g, '').slice(0, 4)
-                            if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2)
-                            setCarte(p => ({ ...p, expiry: v }))
-                          }}
-                          placeholder="MM/AA"
-                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:border-[#FF6B2B] font-mono"
-                        />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">CVV</p>
-                        <input
-                          type="text" inputMode="numeric"
-                          value={carte.cvv}
-                          onChange={e => setCarte(p => ({ ...p, cvv: e.target.value.replace(/\D/g, '').slice(0, 3) }))}
-                          placeholder="123"
-                          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:border-[#FF6B2B] font-mono"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Nom du titulaire</p>
-                      <input
-                        type="text"
-                        value={carte.titulaire}
-                        onChange={e => setCarte(p => ({ ...p, titulaire: e.target.value.toUpperCase() }))}
-                        placeholder="NOM PRÉNOM"
-                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-800 outline-none focus:border-[#FF6B2B] uppercase"
-                      />
-                    </div>
-                  </div>
-                )}
+                <p className="text-xs text-gray-400 mb-5">
+                  Vous serez redirigé vers la page de paiement sécurisée FedaPay pour choisir votre opérateur ({methodeActive?.label}) et confirmer.
+                </p>
 
 {erreur && <p className="text-red-500 text-xs mt-2 mb-1">{erreur}</p>}
 
                 <button type="submit"
                   className="w-full bg-[#FF6B2B] hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl flex items-center justify-center gap-2 transition-colors">
-                  Payer {total.toLocaleString()} FCFA
+                  Continuer vers FedaPay — {total.toLocaleString()} FCFA
                 </button>
               </form>
             </div>
           )}
 
-          {etape === 'attente' && (
+          {etape === 'redirection' && (
             <div className="p-8 text-center">
               <div className="w-16 h-16 mx-auto mb-4 relative">
-                <div className={`w-16 h-16 ${methodeActive?.couleur} rounded-full flex items-center justify-center`}>
-                  <span className={`text-lg font-black ${methodeActive?.textColor}`}>{methodeActive?.logo}</span>
+                <div className="w-16 h-16 bg-white border border-gray-200 rounded-full flex items-center justify-center gap-1 p-2.5">
+                  {methodeActive?.logos.map((src, i) => (
+                    <img key={i} src={src} alt="" className="max-w-full max-h-full object-contain" />
+                  ))}
                 </div>
                 <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center border-2 border-gray-100">
                   <Loader2 size={14} className="text-[#FF6B2B] animate-spin" />
                 </div>
               </div>
-              <h2 className="text-base font-bold text-gray-900 mb-1">Confirmation en cours...</h2>
-              <p className="text-gray-500 text-sm mb-4">
-                Vérifiez votre téléphone <strong>+229 {telephone}</strong>
-              </p>
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-left">
-                <p className="text-xs font-semibold text-amber-800 mb-1">En attente de validation {methodeActive?.label}</p>
-                <p className="text-xs text-amber-600">Montant : <strong>{total.toLocaleString()} FCFA</strong></p>
-                <p className="text-xs text-amber-500 mt-1 flex items-center gap-1">
-                  <Loader2 size={10} className="animate-spin" />
-                  Traitement{secondes > 0 ? ` (${secondes}s)` : '...'}
-                </p>
-              </div>
-            </div>
-          )}
-
-          {etape === 'succes' && (
-            <div className="p-8 text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Check size={32} className="text-green-600" />
-              </div>
-              <h2 className="text-lg font-bold text-gray-900 mb-1">Paiement confirmé !</h2>
-              <p className="text-gray-500 text-sm mb-3">Redirection vers votre confirmation...</p>
-              {transactionId && (
-                <p className="text-xs text-gray-400 font-mono bg-gray-50 rounded-lg px-3 py-1.5 inline-block">
-                  {transactionId}
-                </p>
-              )}
+              <h2 className="text-base font-bold text-gray-900 mb-1">Redirection vers FedaPay...</h2>
+              <p className="text-gray-500 text-sm">Vous allez arriver sur la page de paiement sécurisée.</p>
             </div>
           )}
 

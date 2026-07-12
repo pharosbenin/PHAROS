@@ -159,11 +159,6 @@ class InitierPaiementSerializer(serializers.Serializer):
     methode = serializers.ChoiceField(choices=Paiement.METHODES)
     numero_telephone = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
-    def validate(self, attrs):
-        if attrs['methode'] in ('mtn', 'moov') and not attrs.get('numero_telephone'):
-            raise serializers.ValidationError({'numero_telephone': "Le numéro est requis pour Mobile Money."})
-        return attrs
-
 
 class AnnulationSerializer(serializers.ModelSerializer):
     class Meta:

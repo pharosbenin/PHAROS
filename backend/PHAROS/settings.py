@@ -1,8 +1,10 @@
 import os
 from pathlib import Path
 from datetime import timedelta
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / '.env')
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-pharos-2026-change-en-production')
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
@@ -129,6 +131,13 @@ AUTH_USER_MODEL = 'accounts.CustomUser'
 
 AT_USERNAME = os.environ.get('AT_USERNAME', 'sandbox')
 AT_API_KEY = os.environ.get('AT_API_KEY', '')
+
+FEDAPAY_PUBLIC_KEY = os.environ.get('FEDAPAY_PUBLIC_KEY', '')
+FEDAPAY_SECRET_KEY = os.environ.get('FEDAPAY_SECRET_KEY', '')
+FEDAPAY_ENVIRONMENT = os.environ.get('FEDAPAY_ENVIRONMENT', 'sandbox')
+FEDAPAY_BASE_URL = os.environ.get('FEDAPAY_BASE_URL', 'https://sandbox-api.fedapay.com')
+
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
