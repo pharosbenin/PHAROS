@@ -44,7 +44,7 @@ function NoteBadge({ note }) {
   )
 }
 
-export default function CarteHotel({ hotel, vue = 'grille', estBooste = false }) {
+export default function CarteHotel({ hotel, vue = 'grille', estBooste = false, queryString = '' }) {
   const {
     id, nom, localisation, ville, prix_min, prix_min_original, a_promotion,
     note_moyenne, nb_avis, abonnement, equipements = [], etoiles, photo_principale,
@@ -53,10 +53,11 @@ export default function CarteHotel({ hotel, vue = 'grille', estBooste = false })
 
   const note = parseFloat(note_moyenne) || 0
   const photo = mediaUrl(photo_principale) || PHOTOS_FALLBACK[id % PHOTOS_FALLBACK.length]
+  const lienEtablissement = `/etablissement/${id}${queryString ? `?${queryString}` : ''}`
 
   if (vue === 'liste') {
     return (
-      <Link to={`/etablissement/${id}`} className="group flex bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-lg transition-all duration-300 overflow-hidden">
+      <Link to={lienEtablissement} className="group flex bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-lg transition-all duration-300 overflow-hidden">
         {/* Photo */}
         <div className="relative w-56 shrink-0 overflow-hidden">
           <img src={photo} alt={nom} className="w-full h-full min-h-[160px] object-cover group-hover:scale-105 transition-transform duration-500" />
@@ -122,7 +123,7 @@ export default function CarteHotel({ hotel, vue = 'grille', estBooste = false })
   }
 
   return (
-    <Link to={`/etablissement/${id}`} className="group block bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-xl transition-all duration-300 overflow-hidden">
+    <Link to={lienEtablissement} className="group block bg-white rounded-2xl border border-gray-100 hover:border-gray-200 hover:shadow-xl transition-all duration-300 overflow-hidden">
       {/* Photo */}
       <div className="relative h-52 overflow-hidden">
         <img src={photo} alt={nom} className="w-full h-full object-cover group-hover:scale-108 transition-transform duration-600 ease-out" style={{ transitionDuration: '600ms' }} />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Search, MapPin, Grid3X3, List, X, Star, Filter, Loader2, Navigation, Landmark, TreePine, Church, Sword } from 'lucide-react'
+import { Search, MapPin, Grid3X3, List, X, Star, Filter, Loader2, Navigation, Landmark, TreePine, Church, Sword, Wallet } from 'lucide-react'
 import Layout from '../../components/common/Layout'
 import CarteHotel from '../../components/common/CarteHotel'
 import api from '../../services/api'
@@ -36,8 +36,9 @@ export default function Resultats() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [ville, setVille] = useState(searchParams.get('ville') || '')
-  const [dateArrivee, setDateArrivee] = useState(searchParams.get('arrivee') || '')
-  const [dateDepart, setDateDepart] = useState(searchParams.get('depart') || '')
+  const [dateArrivee] = useState(searchParams.get('arrivee') || '')
+  const [dateDepart] = useState(searchParams.get('depart') || '')
+  const [nom, setNom] = useState(searchParams.get('q') || '')
   const [voyageurs, setVoyageurs] = useState(Math.max(1, parseInt(searchParams.get('voyageurs')) || 1))
   const [tri, setTri] = useState('popularite')
   const [vueGrille, setVueGrille] = useState(true)
@@ -88,7 +89,14 @@ export default function Resultats() {
       .finally(() => setChargement(false))
   }
 
-  useEffect(() => { chargerHotels() }, [ville, tri, pointActif])
+  useEffect(() => { chargerHotels() }, [ville, tri, pointActif, searchParams.get('q')])
+
+  const rechercherParNom = () => {
+    const p = new URLSearchParams(searchParams)
+    if (nom.trim()) p.set('q', nom.trim())
+    else p.delete('q')
+    setSearchParams(p)
+  }
 
   useEffect(() => {
     if (!ville) { setEvenements([]); return }
@@ -103,6 +111,12 @@ export default function Resultats() {
       .then(res => setPointsInteret(res.data || []))
       .catch(() => setPointsInteret([]))
   }, [ville])
+
+  const paramsEtablissement = new URLSearchParams()
+  if (dateArrivee) paramsEtablissement.set('arrivee', dateArrivee)
+  if (dateDepart) paramsEtablissement.set('depart', dateDepart)
+  if (voyageurs) paramsEtablissement.set('voyageurs', voyageurs)
+  const queryStringEtablissement = paramsEtablissement.toString()
 
   const hotelsFiltres = hotels.filter(h => {
     if (filtres.type && h.type_etablissement !== filtres.type) return false
@@ -218,21 +232,15 @@ export default function Resultats() {
       {/* Nombre de personnes */}
       <div>
         <p className="text-sm font-semibold text-gray-700 mb-2">Capacité (personnes)</p>
-        <div className="flex flex-wrap gap-2">
-          {[0, 1, 2, 3, 4, 5, 6].map(n => (
-            <button
-              key={n}
-              onClick={() => setFiltres(prev => ({ ...prev, nbPersonnes: prev.nbPersonnes === n ? 0 : n }))}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                filtres.nbPersonnes === n && n > 0
-                  ? 'bg-orange-500 text-white border-orange-500'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300'
-              }`}
-            >
-              {n === 0 ? 'Tous' : n === 6 ? '6+' : n}
-            </button>
-          ))}
-        </div>
+        <input
+          type="number" min={0} max={20}
+          value={filtres.nbPersonnes || ''}
+          onChange={e => setFiltres(prev => ({ ...prev, nbPersonnes: Math.max(0, parseInt(e.target.value) || 0) }))}
+          onFocus={(e) => e.target.select()}
+          onMouseUp={(e) => e.preventDefault()}
+          placeholder="Toutes capacités"
+          className="appearance-none w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 outline-none focus:border-orange-400 placeholder:text-gray-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+        />
         {filtres.nbPersonnes > 0 && (
           <p className="text-xs text-gray-400 mt-1.5">Chambres pour ≥ {filtres.nbPersonnes} personne{filtres.nbPersonnes > 1 ? 's' : ''}</p>
         )}
@@ -266,35 +274,54 @@ export default function Resultats() {
                 {VILLES_BENIN.map(v => <option key={v} value={v}>{v}</option>)}
               </select>
             </div>
-            <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-2.5 sm:w-40">
-              <input type="date" value={dateArrivee} onChange={e => { setDateArrivee(e.target.value); if (dateDepart && e.target.value >= dateDepart) setDateDepart('') }}
-                className="bg-transparent text-sm text-gray-700 outline-none w-full" placeholder="Arrivée" />
+            <div className="flex flex-[1.5] items-center gap-2 bg-gray-50 hover:bg-gray-100 rounded-xl px-4 py-2.5 transition-colors">
+              <Search size={16} className="text-blue-500 shrink-0" />
+              <input type="text" value={nom}
+                onChange={(e) => setNom(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') rechercherParNom() }}
+                placeholder="Rechercher un hébergement par nom..."
+                className="bg-transparent text-sm text-gray-700 outline-none w-full placeholder:text-gray-400" />
+              {nom && (
+                <button onClick={() => { setNom(''); const p = new URLSearchParams(searchParams); p.delete('q'); setSearchParams(p) }}
+                  className="text-gray-300 hover:text-gray-500 shrink-0">
+                  <X size={14} />
+                </button>
+              )}
             </div>
-            <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-2.5 sm:w-40">
-              <input type="date" value={dateDepart} onChange={e => setDateDepart(e.target.value)}
-                className="bg-transparent text-sm text-gray-700 outline-none w-full" placeholder="Départ" />
+            <div className="flex items-center gap-1.5 bg-white border border-gray-200 focus-within:border-orange-400 rounded-xl px-4 py-2.5 sm:w-44 transition-colors">
+              <Wallet size={16} className="text-blue-500 shrink-0" />
+              <input type="number" min={0} step={5000}
+                value={filtres.prixMax || ''}
+                onChange={(e) => {
+                  const raw = e.target.value
+                  setFiltres(prev => ({ ...prev, prixMax: raw === '' ? 0 : Math.max(0, parseInt(raw) || 0) }))
+                }}
+                onFocus={(e) => e.target.select()}
+                onMouseUp={(e) => e.preventDefault()}
+                placeholder="Budget max"
+                className="appearance-none bg-transparent text-sm text-gray-700 outline-none w-full placeholder:text-gray-400 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+              {filtres.prixMax > 0 && <span className="text-xs text-gray-500 shrink-0">FCFA</span>}
             </div>
-            <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-4 py-2.5 sm:w-36">
+            <div className="flex items-center gap-1 bg-white border border-gray-200 focus-within:border-orange-400 rounded-xl px-4 py-2.5 sm:w-36 transition-colors">
               <input type="number" value={voyageurs} min={1} max={20}
-                onChange={(e) => setVoyageurs(Math.max(1, parseInt(e.target.value) || 1))}
-                className="bg-transparent text-sm text-gray-700 outline-none w-full" />
-              <span className="text-xs text-gray-400 shrink-0">voyageur{voyageurs > 1 ? 's' : ''}</span>
+                onChange={(e) => {
+                  const raw = e.target.value
+                  if (raw === '') { setVoyageurs(''); return }
+                  const v = Math.max(1, Math.min(20, parseInt(raw) || 1))
+                  setVoyageurs(v)
+                  setFiltres(prev => ({ ...prev, nbPersonnes: Math.min(v, 6) }))
+                }}
+                onBlur={() => {
+                  if (voyageurs === '') {
+                    setVoyageurs(1)
+                    setFiltres(prev => ({ ...prev, nbPersonnes: 1 }))
+                  }
+                }}
+                onFocus={(e) => e.target.select()}
+                onMouseUp={(e) => e.preventDefault()}
+                className="appearance-none bg-transparent text-sm text-gray-700 outline-none w-6 shrink-0 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
+              <span className="text-xs text-gray-600 font-medium shrink-0">voyageur{voyageurs > 1 ? 's' : ''}</span>
             </div>
-            <button
-              onClick={() => {
-                const p = new URLSearchParams()
-                if (ville) p.set('ville', ville)
-                if (dateArrivee) p.set('arrivee', dateArrivee)
-                if (dateDepart) p.set('depart', dateDepart)
-                p.set('voyageurs', voyageurs)
-                setSearchParams(p)
-                // Applique réellement le filtre de capacité (sans écraser les autres filtres actifs).
-                setFiltres(prev => ({ ...prev, nbPersonnes: Math.min(voyageurs, 6) }))
-              }}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-colors">
-              <Search size={16} />
-              Rechercher
-            </button>
           </div>
         </div>
       </div>
@@ -436,7 +463,7 @@ export default function Resultats() {
                 : 'space-y-4'
               }>
                 {hotelsFiltres.map(hotel => (
-                  <CarteHotel key={hotel.id} hotel={hotel} vue={vueGrille ? 'grille' : 'liste'} estBooste={hotel.est_booste || false} />
+                  <CarteHotel key={hotel.id} hotel={hotel} vue={vueGrille ? 'grille' : 'liste'} estBooste={hotel.est_booste || false} queryString={queryStringEtablissement} />
                 ))}
               </div>
             )}

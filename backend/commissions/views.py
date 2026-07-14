@@ -90,7 +90,7 @@ def mes_commissions(request):
         hotel = Hotel.objects.filter(gestionnaire=request.user).first()
     if not hotel:
         return Response({'detail': 'Hôtel introuvable.'}, status=status.HTTP_404_NOT_FOUND)
-    commissions = Commission.objects.filter(hotel=hotel)
+    commissions = Commission.objects.filter(hotel=hotel).select_related('hotel', 'paiement__reservation')
     total = sum(c.montant_hotel for c in commissions)
     return Response({
         'commissions': CommissionSerializer(commissions, many=True).data,
@@ -105,7 +105,7 @@ class ToutesCommissions(generics.ListAPIView):
     permission_classes = [IsAuthenticated, EstAdmin]
 
     def get_queryset(self):
-        qs = Commission.objects.all()
+        qs = Commission.objects.select_related('hotel', 'paiement__reservation')
         statut = self.request.query_params.get('statut')
         if statut:
             qs = qs.filter(statut=statut)
@@ -125,7 +125,7 @@ class ToutesCommissions(generics.ListAPIView):
 class TousAbonnements(generics.ListAPIView):
     serializer_class = AbonnementSerializer
     permission_classes = [IsAuthenticated, EstAdmin]
-    queryset = Abonnement.objects.all()
+    queryset = Abonnement.objects.select_related('hotel')
 
 
 class DemandesUpgrade(generics.ListAPIView):
@@ -134,7 +134,7 @@ class DemandesUpgrade(generics.ListAPIView):
 
     def get_queryset(self):
         statut = self.request.query_params.get('statut', 'en_attente')
-        return DemandeUpgradePro.objects.filter(statut=statut)
+        return DemandeUpgradePro.objects.filter(statut=statut).select_related('hotel__gestionnaire', 'traite_par')
 
 
 @api_view(['POST'])
@@ -268,7 +268,7 @@ class TousRetraits(generics.ListAPIView):
 
     def get_queryset(self):
         statut = self.request.query_params.get('statut', 'en_attente')
-        qs = Retrait.objects.all()
+        qs = Retrait.objects.select_related('hotel__gestionnaire')
         if statut != 'tous':
             qs = qs.filter(statut=statut)
         return qs

@@ -44,9 +44,10 @@ class TypeChambreSerializer(serializers.ModelSerializer):
     def get_promotion_active(self, obj):
         from django.utils import timezone
         today = timezone.now().date()
-        promo = obj.promotions.filter(
-            est_active=True, date_debut__lte=today, date_fin__gte=today
-        ).first()
+        promo = next((
+            p for p in obj.promotions.all()
+            if p.est_active and p.date_debut <= today <= p.date_fin
+        ), None)
         if promo:
             return {
                 'id': promo.id,
@@ -95,9 +96,9 @@ class HotelListeSerializer(serializers.ModelSerializer):
     etoiles = serializers.SerializerMethodField()
 
     def get_photo_principale(self, obj):
-        premiere_photo = obj.photos.first()
-        if premiere_photo:
-            return premiere_photo.image.url
+        photos = list(obj.photos.all())
+        if photos:
+            return photos[0].image.url
         return obj.photo_principale.url if obj.photo_principale else None
 
     def get_etoiles(self, obj):
@@ -115,11 +116,15 @@ class HotelListeSerializer(serializers.ModelSerializer):
         prix_min = None
         prix_min_original = None
         a_promotion = False
-        for chambre in instance.types_chambres.filter(est_disponible=True):
+        toutes_chambres = list(instance.types_chambres.all())
+        for chambre in toutes_chambres:
+            if not chambre.est_disponible:
+                continue
             prix = float(chambre.prix_nuit)
-            promo = chambre.promotions.filter(
-                est_active=True, date_debut__lte=today, date_fin__gte=today
-            ).first()
+            promo = next((
+                p for p in chambre.promotions.all()
+                if p.est_active and p.date_debut <= today <= p.date_fin
+            ), None)
             prix_eff = float(promo.prix_promo) if promo else prix
             if prix_min is None or prix_eff < prix_min:
                 prix_min = prix_eff
@@ -128,9 +133,7 @@ class HotelListeSerializer(serializers.ModelSerializer):
         data['prix_min'] = prix_min
         data['prix_min_original'] = prix_min_original
         data['a_promotion'] = a_promotion
-        data['capacite_max'] = max(
-            (c.capacite for c in instance.types_chambres.all()), default=0
-        )
+        data['capacite_max'] = max((c.capacite for c in toutes_chambres), default=0)
         data['est_booste'] = getattr(instance, 'est_booste', False)
         dist = getattr(instance, '_distance_km', None)
         if dist is not None and dist < 9999:

@@ -25,7 +25,9 @@ class RechercheHotels(generics.ListAPIView):
     def get_queryset(self):
         from evenements.models import MiseEnAvantHotel, PointInteret, EvenementNational
         from evenements.utils import distance_km
-        qs = Hotel.objects.filter(statut='valide')
+        qs = Hotel.objects.filter(statut='valide').select_related('gestionnaire').prefetch_related(
+            'photos', 'types_chambres__promotions'
+        )
         params = self.request.query_params
         if ville := params.get('ville'):
             qs = qs.filter(ville__icontains=ville)
@@ -113,7 +115,9 @@ def villes_disponibles(request):
 @permission_classes([AllowAny])
 def detail_hotel(request, pk):
     try:
-        hotel = Hotel.objects.get(pk=pk, statut='valide')
+        hotel = Hotel.objects.select_related('gestionnaire').prefetch_related(
+            'photos', 'types_chambres__photos', 'types_chambres__promotions'
+        ).get(pk=pk, statut='valide')
     except Hotel.DoesNotExist:
         return Response({'detail': 'Hôtel introuvable.'}, status=status.HTTP_404_NOT_FOUND)
     # Rafraîchir est_disponible pour chaque chambre : couvre les dates dépassées

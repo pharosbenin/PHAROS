@@ -153,12 +153,18 @@ export default function Accueil() {
     if (localite) params.set('ville', localite)
     if (dateArrivee) params.set('arrivee', dateArrivee)
     if (dateDepart) params.set('depart', dateDepart)
-    params.set('voyageurs', voyageurs)
+    params.set('voyageurs', voyageurs || 1)
     navigate(`/recherche?${params.toString()}`)
   }
 
   const hotelsPro = hotels.filter(h => h.abonnement === 'pro')
   const hotelsRecommandes = hotels.slice(0, 4)
+
+  const paramsEtablissement = new URLSearchParams()
+  if (dateArrivee) paramsEtablissement.set('arrivee', dateArrivee)
+  if (dateDepart) paramsEtablissement.set('depart', dateDepart)
+  if (voyageurs) paramsEtablissement.set('voyageurs', voyageurs)
+  const queryStringEtablissement = paramsEtablissement.toString()
 
   const scrollRefPro = useRef(null)
   const scrollRefRec = useRef(null)
@@ -255,11 +261,13 @@ export default function Accueil() {
                   <MapPin size={17} className="text-[#F57C2B] shrink-0" />
                   <div className="flex-1 min-w-0">
                     <label className="text-xs text-gray-400 font-semibold block">Destination</label>
-                    <select value={localite} onChange={(e) => setLocalite(e.target.value)}
-                      className="w-full bg-transparent text-gray-800 text-sm font-medium outline-none cursor-pointer">
-                      <option value="">Toutes les villes</option>
-                      {TOUTES_VILLES_BENIN.map(v => <option key={v} value={v}>{v}</option>)}
-                    </select>
+                    <input type="text" list="villes-benin" value={localite}
+                      onChange={(e) => setLocalite(e.target.value)}
+                      placeholder="Toutes les villes"
+                      className="w-full bg-transparent text-gray-800 text-sm font-medium outline-none placeholder:text-gray-400 placeholder:font-normal" />
+                    <datalist id="villes-benin">
+                      {TOUTES_VILLES_BENIN.map(v => <option key={v} value={v} />)}
+                    </datalist>
                   </div>
                 </div>
 
@@ -290,9 +298,16 @@ export default function Accueil() {
                   <div className="flex-1 min-w-0">
                     <label className="text-xs text-gray-400 font-semibold block">Voyageurs</label>
                     <input type="number" value={voyageurs}
-                      onChange={(e) => setVoyageurs(Math.max(1, parseInt(e.target.value) || 1))}
+                      onChange={(e) => {
+                        const raw = e.target.value
+                        if (raw === '') { setVoyageurs(''); return }
+                        setVoyageurs(Math.max(1, Math.min(20, parseInt(raw) || 1)))
+                      }}
+                      onBlur={() => { if (voyageurs === '') setVoyageurs(1) }}
+                      onFocus={(e) => e.target.select()}
+                      onMouseUp={(e) => e.preventDefault()}
                       min={1} max={20}
-                      className="w-full bg-transparent text-gray-800 text-sm font-medium outline-none" />
+                      className="appearance-none w-full bg-transparent text-gray-800 text-sm font-medium outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none" />
                   </div>
                 </div>
 
@@ -361,7 +376,7 @@ export default function Accueil() {
             <div ref={scrollRefPro} className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 scroll-smooth scrollbar-hide">
               {hotelsPro.slice(0, 5).map(hotel => (
                 <div key={hotel.id} className="w-[280px] flex-shrink-0">
-                  <CarteHotel hotel={hotel} estBooste={hotel.est_booste || false} />
+                  <CarteHotel hotel={hotel} estBooste={hotel.est_booste || false} queryString={queryStringEtablissement} />
                 </div>
               ))}
             </div>
@@ -468,7 +483,7 @@ export default function Accueil() {
               <div ref={scrollRefRec} className="flex gap-4 overflow-x-auto pb-3 -mx-4 px-4 scroll-smooth scrollbar-hide">
                 {hotelsRecommandes.map(hotel => (
                   <div key={hotel.id} className="w-[280px] flex-shrink-0">
-                    <CarteHotel hotel={hotel} estBooste={hotel.est_booste || false} />
+                    <CarteHotel hotel={hotel} estBooste={hotel.est_booste || false} queryString={queryStringEtablissement} />
                   </div>
                 ))}
               </div>

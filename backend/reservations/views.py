@@ -680,7 +680,9 @@ class MesReservations(generics.ListAPIView):
         user = self.request.user
         return Reservation.objects.filter(
             Q(client=user) | Q(client__isnull=True, email_client__iexact=user.email)
-        ).exclude(statut='en_attente').distinct()
+        ).exclude(statut='en_attente').distinct().select_related(
+            'hotel', 'type_chambre', 'paiement', 'annulation', 'avis'
+        )
 
 
 # --- Espace gestionnaire ---
@@ -690,7 +692,9 @@ class ReservationsHotel(generics.ListAPIView):
     permission_classes = [IsAuthenticated, EstGestionnaire, EstNonSuspendu, EstHotelValide]
 
     def get_queryset(self):
-        qs = Reservation.objects.filter(hotel__gestionnaire=self.request.user).exclude(statut='en_attente')
+        qs = Reservation.objects.filter(hotel__gestionnaire=self.request.user).exclude(
+            statut='en_attente'
+        ).select_related('hotel', 'type_chambre', 'paiement', 'annulation', 'avis')
         hotel_id = self.request.query_params.get('hotel_id')
         if hotel_id:
             qs = qs.filter(hotel_id=hotel_id)
@@ -705,7 +709,7 @@ class ReservationsHotel(generics.ListAPIView):
 class ToutesReservations(generics.ListAPIView):
     serializer_class = ReservationListeSerializer
     permission_classes = [IsAuthenticated, EstAdmin]
-    queryset = Reservation.objects.all()
+    queryset = Reservation.objects.select_related('hotel', 'type_chambre', 'paiement', 'annulation', 'avis').all()
 
     def get_queryset(self):
         qs = super().get_queryset()

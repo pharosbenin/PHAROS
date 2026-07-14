@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import {
   MapPin, Star, Wifi, Car, Coffee, Waves, Dumbbell, Sparkles, Wind,
   Phone, Mail, Globe, ChevronLeft, Heart, Share2, X, ChevronRight,
@@ -153,6 +153,7 @@ function normaliserHotel(h) {
 export default function DetailEtablissement() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user } = useAuth()
   const peutReserver = !user || user.role === 'client'
   const estBloqueParRole = user && user.role !== 'client'
@@ -164,8 +165,9 @@ export default function DetailEtablissement() {
   const [galerieOuverte, setGalerieOuverte] = useState(false)
   const [galerieIndex, setGalerieIndex] = useState(0)
   const [onglet, setOnglet] = useState('chambres')
-  const [dateArrivee, setDateArrivee] = useState('')
-  const [dateDepart, setDateDepart] = useState('')
+  const [dateArrivee, setDateArrivee] = useState(searchParams.get('arrivee') || '')
+  const [dateDepart, setDateDepart] = useState(searchParams.get('depart') || '')
+  const voyageursDemandes = parseInt(searchParams.get('voyageurs')) || 0
   const [enFavori, setEnFavori] = useState(false)
   const [erreurDates, setErreurDates] = useState(false)
   const [signalModalOuvert, setSignalModalOuvert] = useState(false)
@@ -273,6 +275,17 @@ export default function DetailEtablissement() {
 
   // Disponibilité effective : filtrée par dates si l'utilisateur a sélectionné des dates, sinon état général (aujourd'hui)
   const isDispo = (chambre) => chambresDispoIds !== null ? chambresDispoIds.has(chambre.id) : true
+
+  // Si un nombre de voyageurs a été précisé (venant de l'accueil/recherche), les chambres
+  // qui peuvent l'accueillir sont affichées en premier (tri stable, aucune chambre masquée).
+  const chambresTriees = voyageursDemandes > 0
+    ? [...hotel.chambres].sort((a, b) => {
+        const aOk = a.capacite >= voyageursDemandes
+        const bOk = b.capacite >= voyageursDemandes
+        if (aOk === bOk) return 0
+        return aOk ? -1 : 1
+      })
+    : hotel.chambres
 
   const ouvrirGalerie = (index) => { setGalerieIndex(index); setGalerieOuverte(true) }
 
@@ -441,7 +454,7 @@ export default function DetailEtablissement() {
                     <Info size={15} className="shrink-0" /> Sélectionnez vos dates (à droite) pour voir les prix exacts et réserver.
                   </div>
                 )}
-                {hotel.chambres.map(chambre => {
+                {chambresTriees.map(chambre => {
                   const dispo = isDispo(chambre)
                   return (
                   <div key={chambre.id} className={`bg-white rounded-2xl border overflow-hidden ${!dispo ? 'opacity-60 border-gray-100' : 'border-gray-200 hover:border-blue-200 hover:shadow-md transition-all'}`}>
@@ -462,6 +475,11 @@ export default function DetailEtablissement() {
                               </span>
                             )}
                             {chambre.promotion && <span className="text-xs bg-red-500 text-white px-2 py-0.5 rounded-full font-bold">Promo {chambre.promotion.titre ? `· ${chambre.promotion.titre}` : ''}</span>}
+                            {voyageursDemandes > 0 && chambre.capacite >= voyageursDemandes && (
+                              <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                                Convient pour {voyageursDemandes} voyageur{voyageursDemandes > 1 ? 's' : ''}
+                              </span>
+                            )}
                           </div>
                           <p className="text-sm text-gray-500 mb-2 flex items-center gap-1">
                             <Users size={13} /> Jusqu'à {chambre.capacite} personnes
