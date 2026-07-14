@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { TrendingUp, TrendingDown, Users, BedDouble, Star, CheckCircle, ChevronRight, Bell, Calendar, Loader, Shield, ArrowDownToLine } from 'lucide-react'
 import SidebarHotelier from '../../components/common/SidebarHotelier'
 import BanniereAttente from '../../components/common/BanniereAttente'
@@ -28,6 +29,7 @@ const STATUT_CHAMBRE = {
 const STATUTS_ACTIFS = ['payee', 'confirmee', 'en_cours', 'confirme_client', 'confirme_hotel']
 
 export default function DashboardHotelier() {
+  const navigate = useNavigate()
   const { user } = useAuth()
   const { hotelActif } = useHotelActif()
   const [periode, setPeriode] = useState('mois')
@@ -36,6 +38,7 @@ export default function DashboardHotelier() {
   const [reservations, setReservations] = useState([])
   const [avis, setAvis] = useState([])
   const [chambres, setChambres] = useState([])
+  const [notifOuverte, setNotifOuverte] = useState(false)
 
   const chargerDonnees = async () => {
     if (!hotelActif) return
@@ -200,12 +203,52 @@ export default function DashboardHotelier() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button className="relative p-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50">
-              <Bell size={18} className="text-gray-500" />
-              {arriveesAujourdhui.length > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+            <div className="relative">
+              <button onClick={() => setNotifOuverte(o => !o)}
+                className="relative p-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50">
+                <Bell size={18} className="text-gray-500" />
+                {arriveesAujourdhui.length > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                )}
+              </button>
+              {notifOuverte && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setNotifOuverte(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl border border-gray-100 shadow-xl z-50">
+                    <div className="px-4 py-3 border-b border-gray-50">
+                      <h3 className="font-bold text-gray-900 text-sm">Notifications</h3>
+                    </div>
+                    {arriveesAujourdhui.length === 0 ? (
+                      <div className="p-6 text-center text-gray-400 text-sm">
+                        <CheckCircle size={22} className="mx-auto mb-2 text-green-400" />
+                        Aucune arrivée prévue aujourd'hui
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
+                        {arriveesAujourdhui.slice(0, 5).map(r => (
+                          <button key={r.id} onClick={() => { setNotifOuverte(false); navigate('/hotelier/reservations') }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left">
+                            <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
+                              <Calendar size={14} className="text-blue-500" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-gray-800 truncate">
+                                Arrivée aujourd'hui : {r.nom_client ? `${r.prenom_client ?? ''} ${r.nom_client}`.trim() : 'Client'}
+                              </p>
+                              <p className="text-xs text-gray-400 truncate">{r.type_chambre_nom} · {r.nb_nuits} nuit{r.nb_nuits > 1 ? 's' : ''}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button onClick={() => { setNotifOuverte(false); navigate('/hotelier/reservations') }}
+                      className="w-full text-center py-2.5 text-xs font-semibold text-blue-600 hover:bg-gray-50 border-t border-gray-50 rounded-b-2xl">
+                      Voir les réservations
+                    </button>
+                  </div>
+                </>
               )}
-            </button>
+            </div>
             <div className="bg-gray-100 rounded-xl p-1 flex text-xs font-semibold">
               {['semaine', 'mois', 'année'].map(p => (
                 <button key={p} onClick={() => setPeriode(p)}
