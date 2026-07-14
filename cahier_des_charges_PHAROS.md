@@ -1,7 +1,7 @@
 # CAHIER DES CHARGES — PLATEFORME PHAROS BÉNIN
 
-**Version :** 2.1
-**Date :** Juin 2026
+**Version :** 2.2
+**Date :** Juillet 2026
 **Auteurs :** Chanel AKOUEHOU et Charlotte AHOUAVLAME
 **Statut :** Document de référence
 
@@ -83,6 +83,7 @@ La plateforme couvre 3 espaces distincts selon le rôle de l'utilisateur.
 - Dashboard mes réservations
 - Modifier / Annuler une réservation
 - Commander au restaurant de l'hôtel
+- Assistance voyageur (« Mon Séjour ») : services de proximité autour de l'hôtel
 - Donner un avis après séjour, Profil personnel
 
 ### Espace Hôtelier (rôle = gestionnaire)
@@ -247,6 +248,7 @@ Hausse : supplément à payer. Baisse : remboursement partiel après frais.
 | Annuler la réservation | Avant la date d'arrivée, statut payee |
 | Voir le QR Code | Paiement réussi |
 | Commander au restaurant | Réservation en cours |
+| Consulter « Mon Séjour » (services à proximité) | Séjour actif : payee, confirmee, en_cours, confirme_client, confirme_hotel ou terminee |
 | Donner un avis | Statut terminee, avis_disponible = True |
 | Confirmer fin de séjour | 5h avant départ, statut en_cours ou confirme_hotel |
 
@@ -296,6 +298,25 @@ Tri des résultats : est_booste DESC > type_abonnement DESC > note_moyenne DESC
 - Festival International de Dassa (juil, Dassa-Zoumè)
 - Fête Nationale du Bénin (1er août, Cotonou / Porto-Novo)
 - We Love Yaoundé — Bénin (26-31 déc, Cotonou)
+
+---
+
+### 5.12 MODULE ASSISTANCE VOYAGEUR (« MON SÉJOUR »)
+
+**Objectif :** permettre à un client en séjour actif de consulter, sans aucune saisie de sa part, les services utiles autour de son hôtel (pharmacies, hôpitaux/cliniques, stations-service, centres commerciaux/marchés, garages/mécaniciens).
+
+**Alimentation des données :** les services référencés proviennent d'un import automatisé depuis **OpenStreetMap** (géocodage des 77 communes du Bénin via Nominatim, puis extraction des points d'intérêt via Overpass API), rejouable à tout moment sans créer de doublons (identifiant externe unique par service) et sans jamais écraser une fiche corrigée manuellement par un administrateur (source = manuel).
+
+**Calcul de proximité :** au chargement, le serveur calcule la distance réelle (formule de Haversine) entre les coordonnées GPS de l'hôtel de la réservation et chaque service actif en base. Seules les catégories ayant au moins un service dans le rayon sont renvoyées, triées par distance croissante.
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Rayon de recherche standard | 15 km |
+| Rayon de secours (si aucun résultat dans le rayon standard) | 50 km, appliqué uniquement si aucune catégorie n'a de résultat dans le rayon standard |
+
+**Contrôle d'accès :** consultable uniquement par le client propriétaire de la réservation (compte connecté ou email correspondant à la réservation) ou un administrateur, et uniquement si la réservation est dans un statut de séjour actif (payee, confirmee, en_cours, confirme_client, confirme_hotel, terminee) — jamais pour une réservation en attente de paiement, annulée ou remboursée.
+
+**Restitution :** pour chaque service — nom, adresse, horaires (si disponibles), distance en km, lien d'itinéraire Google Maps généré à partir des coordonnées GPS.
 
 ---
 
@@ -363,6 +384,7 @@ Tri des résultats : est_booste DESC > type_abonnement DESC > note_moyenne DESC
 | avis | Avis clients, signalements |
 | commissions | Abonnements, demandes Pro, commissions |
 | evenements | Événements nationaux, mises en avant hôtels |
+| assistance | Services de proximité (catégories + import OpenStreetMap), assistance voyageur « Mon Séjour » |
 
 ### 7.3 Déploiement
 
@@ -407,6 +429,8 @@ Tri des résultats : est_booste DESC > type_abonnement DESC > note_moyenne DESC
 | Commission | commissions | Commission prélevée |
 | EvenementNational | evenements | Événement culturel/national |
 | MiseEnAvantHotel | evenements | Hôtel boosté pendant un événement |
+| CategorieService | assistance | Catégorie de service de proximité (pharmacie, hôpital, station-service...) |
+| ServiceProximite | assistance | Service géolocalisé concret (nom, adresse, ville, GPS, horaires, source) |
 
 ### 8.2 Relations principales
 
@@ -416,6 +440,8 @@ Tri des résultats : est_booste DESC > type_abonnement DESC > note_moyenne DESC
 - Reservation 1:1 Paiement, QRCodeReservation, Avis, Annulation
 - Paiement 1:1 Commission
 - EvenementNational 1:N MiseEnAvantHotel
+- CategorieService 1:N ServiceProximite
+- Hotel ↔ ServiceProximite : pas de relation en base — rapprochement calculé à la volée par distance GPS (Haversine) au moment de la requête « Mon Séjour »
 
 ---
 
@@ -533,6 +559,13 @@ Tri des résultats : est_booste DESC > type_abonnement DESC > note_moyenne DESC
 | GET | /api/evenements/ | Non | Événements actifs |
 | GET | /api/evenements/<id>/ | Non | Détail avec hôtels boostés |
 
+### 9.7 Assistance voyageur
+
+| Méthode | Endpoint | Auth | Description |
+|---------|----------|------|--------------|
+| GET | /api/assistance/categories/ | Non | Catégories de service actives |
+| GET | /api/assistance/mon-sejour/<numero_reservation>/ | Partiel | Services à proximité de l'hôtel, réservés au client de la réservation (ou admin) et à un séjour actif |
+
 ---
 
 ## 10. RÈGLES DE GESTION
@@ -554,6 +587,7 @@ Tri des résultats : est_booste DESC > type_abonnement DESC > note_moyenne DESC
 | RG13 | Détection mots interdits : français, anglais, Fon/Goun, Yoruba/Nago, Mina/Ewe, Dendi/Bariba, Peul |
 | RG14 | Filtre boost vérifie hotel__type_abonnement='pro' en base — Freemium jamais boosté |
 | RG15 | Fenêtre de confirmation fin de séjour : 5 heures avant la date de départ |
+| RG16 | Assistance voyageur consultable uniquement sur un séjour actif, dans un rayon de 15 km autour de l'hôtel (étendu à 50 km si aucun résultat) |
 
 ---
 
@@ -562,6 +596,7 @@ Tri des résultats : est_booste DESC > type_abonnement DESC > note_moyenne DESC
 | Contrainte | Détail |
 |-----------|--------|
 | Cartographie | OpenStreetMap (gratuit) via react-leaflet |
+| Services de proximité | Import OpenStreetMap (Nominatim pour le géocodage, Overpass API pour les points d'intérêt) — gratuit, rejouable, sans doublons |
 | Hébergement | Render free tier (backend + BDD), Vercel free tier (frontend) |
 | Paiement | Simulé en V1 — FedaPay / Kkiapay prévu en V2 |
 | Stockage fichiers | Render — migration CDN prévue en V2 |
@@ -602,6 +637,7 @@ Tri des résultats : est_booste DESC > type_abonnement DESC > note_moyenne DESC
 | Check-in | Arrivée du client, validée par scan du QR Code |
 | Double confirmation | Client + hôtel confirment la fin du séjour avant libération des fonds |
 | Escrow | Rétention des fonds jusqu'à validation mutuelle du séjour |
+| Assistance voyageur (Mon Séjour) | Fonctionnalité affichant les services de proximité (pharmacie, hôpital, station-service...) autour de l'hôtel d'un séjour actif |
 | En vedette | Badge sur les hôtels Pro boostés pendant un événement actif |
 | Partenaire certifié | Badge sur les hôtels Pro non boostés |
 | Taux d'occupation | Chambres occupées aujourd'hui / total chambres |
@@ -612,4 +648,5 @@ Tri des résultats : est_booste DESC > type_abonnement DESC > note_moyenne DESC
 ---
 
 Document produit et maintenu à partir du code source du projet PHAROS BÉNIN.
-Dernière mise à jour : Juin 2026 — v2.1 (corrections : statut confirmee, delai_gratuit, nom événement, statut annulee restaurant, endpoints complets)
+Dernière mise à jour : Juillet 2026 — v2.2 (ajout module Assistance voyageur « Mon Séjour » : app assistance, entités CategorieService/ServiceProximite, endpoints, règle RG16)
+Précédente : Juin 2026 — v2.1 (corrections : statut confirmee, delai_gratuit, nom événement, statut annulee restaurant, endpoints complets)
