@@ -260,7 +260,7 @@ export default function Accueil() {
                 <div className="flex-1 flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors">
                   <MapPin size={17} className="text-[#F57C2B] shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <label className="text-xs text-gray-400 font-semibold block">Destination</label>
+                    <label className="text-xs text-gray-700 font-bold block">Destination</label>
                     <input type="text" list="villes-benin" value={localite}
                       onChange={(e) => setLocalite(e.target.value)}
                       placeholder="Toutes les villes"
@@ -276,7 +276,7 @@ export default function Accueil() {
                 <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors sm:w-44">
                   <Calendar size={17} className="text-[#F57C2B] shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <label className="text-xs text-gray-400 font-semibold block">Arrivée</label>
+                    <label className="text-xs text-gray-700 font-bold block">Arrivée</label>
                     <input type="date" value={dateArrivee} onChange={e => { setDateArrivee(e.target.value); if (dateDepart && e.target.value >= dateDepart) setDateDepart('') }}
                       min={new Date().toISOString().split('T')[0]}
                       className="w-full bg-transparent text-gray-800 text-sm font-medium outline-none" />
@@ -286,7 +286,7 @@ export default function Accueil() {
                 <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors sm:w-44">
                   <Calendar size={17} className="text-[#F57C2B] shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <label className="text-xs text-gray-400 font-semibold block">Départ</label>
+                    <label className="text-xs text-gray-700 font-bold block">Départ</label>
                     <input type="date" value={dateDepart} onChange={(e) => setDateDepart(e.target.value)}
                       min={dateArrivee ? new Date(new Date(dateArrivee).getTime() + 86400000).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]}
                       className="w-full bg-transparent text-gray-800 text-sm font-medium outline-none" />
@@ -296,7 +296,7 @@ export default function Accueil() {
                 <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors sm:w-32">
                   <Users size={17} className="text-[#F57C2B] shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <label className="text-xs text-gray-400 font-semibold block">Voyageurs</label>
+                    <label className="text-xs text-gray-700 font-bold block">Voyageurs</label>
                     <input type="number" value={voyageurs}
                       onChange={(e) => {
                         const raw = e.target.value

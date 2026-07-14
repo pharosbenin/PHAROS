@@ -32,7 +32,9 @@ class RechercheHotels(generics.ListAPIView):
         if ville := params.get('ville'):
             qs = qs.filter(ville__icontains=ville)
         if q := params.get('q'):
-            qs = qs.filter(Q(nom__icontains=q) | Q(description__icontains=q) | Q(quartier__icontains=q))
+            qs = qs.filter(
+                Q(nom__icontains=q) | Q(description__icontains=q) | Q(quartier__icontains=q) | Q(ville__icontains=q)
+            )
         if prix_max := params.get('prix_max'):
             qs = qs.filter(types_chambres__prix_nuit__lte=prix_max).distinct()
         if capacite := params.get('capacite'):
