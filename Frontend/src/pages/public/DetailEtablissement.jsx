@@ -460,7 +460,7 @@ export default function DetailEtablissement() {
                   <div key={chambre.id} className={`bg-white rounded-2xl border overflow-hidden ${!dispo ? 'opacity-60 border-gray-100' : 'border-gray-200 hover:border-blue-200 hover:shadow-md transition-all'}`}>
                     <div className="flex flex-col sm:flex-row">
                       {chambre.photo && (
-                        <div className="sm:w-48 h-40 sm:h-auto shrink-0 overflow-hidden">
+                        <div className="sm:w-48 h-40 shrink-0 overflow-hidden">
                           <img src={chambre.photo} alt={chambre.type}
                             className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
                         </div>

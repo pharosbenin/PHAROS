@@ -230,20 +230,20 @@ export default function Accueil() {
             
           
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tight mb-6">
-              <span className="text-[#F57C2B] drop-shadow-lg">Pharos Bénin</span>{' '}
-              <span className="text-white">est le phare</span><br />
-              <span className="text-white">de votre séjour</span>
+              <span className="inline-block animate-fade-in-up text-[#F57C2B] drop-shadow-lg">Pharos Bénin</span>{' '}
+              <span className="inline-block animate-fade-in-up text-white">est le phare</span><br />
+              <span className="inline-block animate-fade-in-up animate-delay-150 text-white">de votre séjour</span>
             </h1>
 
             <div className="flex items-center justify-center gap-4 mb-4">
               <div className="w-16 h-px bg-gradient-to-r from-transparent to-white/30" />
-              <p className="text-xl sm:text-2xl font-semibold text-white/85 tracking-wide">
+              <p className="animate-fade-in-up animate-delay-300 text-xl sm:text-2xl font-semibold text-white/85 tracking-wide">
                 Votre hébergement idéal
               </p>
               <div className="w-16 h-px bg-gradient-to-l from-transparent to-white/30" />
             </div>
 
-            <p className="text-sm text-white/70 font-semibold tracking-[0.25em] uppercase mb-10">
+            <p className="animate-fade-in-up animate-delay-450 text-sm text-white/70 font-semibold tracking-[0.25em] uppercase mb-10">
               partout au Bénin
             </p>
 

@@ -2,6 +2,31 @@ import re
 from rest_framework import serializers
 from .models import Hotel, TypeChambre, PhotoHotel, PhotoChambre, PlatMenu, CommandeRestaurant, LigneCommande, Promotion
 
+EXTENSIONS_DOCUMENT_AUTORISEES = {'pdf', 'jpg', 'jpeg', 'png', 'webp'}
+
+
+def _valider_fichier_document(fichier):
+    """Vérifie l'extension ET la signature binaire réelle du fichier (magic bytes) —
+    l'extension seule peut être falsifiée (ex: un .docx renommé en .pdf)."""
+    extension = fichier.name.rsplit('.', 1)[-1].lower() if '.' in fichier.name else ''
+    if extension not in EXTENSIONS_DOCUMENT_AUTORISEES:
+        raise serializers.ValidationError(
+            'Veuillez fournir un document au format PDF, JPG, PNG ou WEBP.'
+        )
+    entete = fichier.read(12)
+    fichier.seek(0)
+    est_valide = (
+        entete.startswith(b'%PDF')
+        or entete.startswith(b'\xff\xd8\xff')
+        or entete.startswith(b'\x89PNG\r\n\x1a\n')
+        or (entete.startswith(b'RIFF') and entete[8:12] == b'WEBP')
+    )
+    if not est_valide:
+        raise serializers.ValidationError(
+            "Veuillez fournir un fichier PDF ou image valide — le contenu ne correspond pas au format annoncé."
+        )
+    return fichier
+
 
 class PhotoHotelSerializer(serializers.ModelSerializer):
     class Meta:
@@ -182,6 +207,12 @@ class HotelCreerSerializer(serializers.ModelSerializer):
                   'taux_annulation', 'taux_modification', 'delai_gratuit',
                   'photo_principale', 'document_registre', 'document_identite')
         read_only_fields = ('id',)
+
+    def validate_document_registre(self, value):
+        return _valider_fichier_document(value) if value else value
+
+    def validate_document_identite(self, value):
+        return _valider_fichier_document(value) if value else value
 
     def create(self, validated_data):
         validated_data['gestionnaire'] = self.context['request'].user

@@ -21,6 +21,15 @@ L.Icon.Default.mergeOptions({
 
 const STORAGE_KEY = 'pharos_inscription_hotelier'
 
+// L'attribut accept du <input type="file"> n'est qu'indicatif (contournable via "Tous les
+// fichiers" ou le glisser-déposer) — on revalide donc l'extension ici après sélection. Le
+// contenu réel est revérifié côté serveur (impossible de se fier uniquement à l'extension).
+const EXTENSIONS_DOCUMENT_AUTORISEES = ['pdf', 'jpg', 'jpeg', 'png', 'webp']
+const extensionAutorisee = (fichier) => {
+  const ext = fichier.name.includes('.') ? fichier.name.split('.').pop().toLowerCase() : ''
+  return EXTENSIONS_DOCUMENT_AUTORISEES.includes(ext)
+}
+
 const VILLES_COORDS = {
   'Cotonou': [6.3654, 2.4183],
   'Porto-Novo': [6.4969, 2.6289],
@@ -921,7 +930,17 @@ export default function InscriptionHotelier() {
                   }
                 </div>
                 <input ref={registreRef} type="file" accept=".pdf,image/*" className="hidden"
-                  onChange={e => setDocs(d => ({ ...d, registre: e.target.files[0] }))} />
+                  onChange={e => {
+                    const fichier = e.target.files[0]
+                    if (!fichier) return
+                    if (!extensionAutorisee(fichier)) {
+                      setErreur('Veuillez sélectionner un fichier au format PDF, JPG, PNG ou WEBP.')
+                      e.target.value = ''
+                      return
+                    }
+                    setErreur('')
+                    setDocs(d => ({ ...d, registre: fichier }))
+                  }} />
               </div>
 
               {/* Pièce d'identité */}
@@ -947,7 +966,17 @@ export default function InscriptionHotelier() {
                   }
                 </div>
                 <input ref={identiteRef} type="file" accept=".pdf,image/*" className="hidden"
-                  onChange={e => setDocs(d => ({ ...d, identite: e.target.files[0] }))} />
+                  onChange={e => {
+                    const fichier = e.target.files[0]
+                    if (!fichier) return
+                    if (!extensionAutorisee(fichier)) {
+                      setErreur('Veuillez sélectionner un fichier au format PDF, JPG, PNG ou WEBP.')
+                      e.target.value = ''
+                      return
+                    }
+                    setErreur('')
+                    setDocs(d => ({ ...d, identite: fichier }))
+                  }} />
               </div>
 
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-xs text-gray-500 flex items-start gap-2">

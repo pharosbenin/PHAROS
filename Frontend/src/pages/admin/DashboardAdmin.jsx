@@ -11,6 +11,7 @@ export default function DashboardAdmin() {
   const [chargement, setChargement] = useState(true)
   const [stats, setStats] = useState({ hotels: [], users: [], commissions: null, reservations: [] })
   const [derniereMaj, setDerniereMaj] = useState(null)
+  const [notifOuverte, setNotifOuverte] = useState(false)
 
   const charger = () => {
     Promise.all([
@@ -48,7 +49,7 @@ export default function DashboardAdmin() {
 
   const kpis = [
     { label: 'Revenus plateforme', valeur: `${Number(totalRevenu).toLocaleString()} FCFA`, icon: TrendingUp, couleur: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Hôtels enregistrés', valeur: hotels.length, icon: Hotel, couleur: 'text-blue-600', bg: 'bg-blue-50' },
+    { label: 'Hôtels enregistrés', valeur: hotels.filter(h => h.statut !== 'rejete').length, icon: Hotel, couleur: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Utilisateurs actifs', valeur: usersActifs.length, icon: Users, couleur: 'text-indigo-600', bg: 'bg-indigo-50' },
     { label: 'Réservations totales', valeur: reservations.length, icon: BookOpen, couleur: 'text-amber-600', bg: 'bg-amber-50' },
   ]
@@ -122,12 +123,17 @@ export default function DashboardAdmin() {
 
   // Valeur réelle (non arrondie) de chaque barre non nulle, positionnée sur l'axe Y en vert,
   // pour lire la hauteur exacte d'une barre (ex: 135k) même quand elle tombe entre deux graduations.
+  // Triées par position puis filtrées : quand deux valeurs distinctes tombent trop près l'une de
+  // l'autre (ex: 3.5k et 3.3k en vue Mois, où il y a beaucoup plus de barres qu'en Semaine/Année),
+  // on ne garde que la première rencontrée pour éviter que leurs libellés ne se chevauchent.
+  const SEUIL_COLLISION_PX = 12
   const marqueursValeursReelles = [...new Set(revenusPeriode.filter(r => r.montant > 0).map(r => r.montant))]
     .map(montant => ({ montant, topPx: BAR_MAX_PX - (montant / plafondEchelle) * BAR_MAX_PX }))
+    .sort((a, b) => a.topPx - b.topPx)
+    .filter((m, i, arr) => i === 0 || m.topPx - arr[i - 1].topPx >= SEUIL_COLLISION_PX)
 
   // Une graduation ronde trop proche d'une valeur réelle (en pixels) est masquée pour éviter
   // que les deux libellés (ex: "150k" et "134.8k") ne se chevauchent visuellement.
-  const SEUIL_COLLISION_PX = 12
   const graduationMasquee = (topPxGraduation) =>
     marqueursValeursReelles.some(m => Math.abs(m.topPx - topPxGraduation) < SEUIL_COLLISION_PX)
   const titrePeriode = periode === 'semaine'
@@ -136,8 +142,8 @@ export default function DashboardAdmin() {
       ? `Revenus quotidiens — ${maintenant.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}`
       : `Revenus mensuels ${maintenant.getFullYear()}`
 
-  const hotelsProCount = hotels.filter(h => h.type_abonnement === 'pro').length
-  const hotelsFreemiumCount = hotels.filter(h => h.type_abonnement === 'freemium').length
+  const hotelsProCount = hotels.filter(h => h.statut !== 'rejete' && h.type_abonnement === 'pro').length
+  const hotelsFreemiumCount = hotels.filter(h => h.statut !== 'rejete' && h.type_abonnement === 'freemium').length
 
   if (chargement) return (
     <div className="flex min-h-screen bg-gray-50">
@@ -161,12 +167,50 @@ export default function DashboardAdmin() {
             <p className="text-gray-400 text-sm mt-0.5">Vue globale de la plateforme PHAROS BENIN</p>
           </div>
           <div className="flex items-center gap-3">
-            <button className="relative p-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50">
-              <Bell size={18} className="text-gray-500" />
-              {hotelsEnAttente.length > 0 && (
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+            <div className="relative">
+              <button onClick={() => setNotifOuverte(o => !o)}
+                className="relative p-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-50">
+                <Bell size={18} className="text-gray-500" />
+                {hotelsEnAttente.length > 0 && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                )}
+              </button>
+              {notifOuverte && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setNotifOuverte(false)} />
+                  <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-2xl border border-gray-100 shadow-xl z-50">
+                    <div className="px-4 py-3 border-b border-gray-50">
+                      <h3 className="font-bold text-gray-900 text-sm">Notifications</h3>
+                    </div>
+                    {hotelsEnAttente.length === 0 ? (
+                      <div className="p-6 text-center text-gray-400 text-sm">
+                        <CheckCircle size={22} className="mx-auto mb-2 text-green-400" />
+                        Rien de nouveau à traiter
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
+                        {hotelsEnAttente.slice(0, 5).map(h => (
+                          <button key={h.id} onClick={() => { setNotifOuverte(false); navigate('/admin/hotels') }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left">
+                            <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center shrink-0">
+                              <Clock size={14} className="text-amber-500" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-gray-800 truncate">Nouvel hôtel à valider : {h.nom}</p>
+                              <p className="text-xs text-gray-400 truncate">{h.gestionnaire_nom} · {h.ville}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button onClick={() => { setNotifOuverte(false); navigate('/admin/hotels') }}
+                      className="w-full text-center py-2.5 text-xs font-semibold text-blue-600 hover:bg-gray-50 border-t border-gray-50 rounded-b-2xl">
+                      Voir la validation des hôtels
+                    </button>
+                  </div>
+                </>
               )}
-            </button>
+            </div>
             <div className="bg-gray-100 rounded-xl p-1 flex text-xs font-semibold">
               {['semaine', 'mois', 'année'].map(p => (
                 <button key={p} onClick={() => setPeriode(p)}

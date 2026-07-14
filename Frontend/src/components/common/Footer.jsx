@@ -75,6 +75,9 @@ export default function Footer() {
             <a href="#" className="hover:text-white transition-colors">Politique de confidentialité</a>
           </div>
         </div>
+        <p className="text-xs text-gray-600 text-center sm:text-left mt-3">
+          Les images des établissements affichées sur ce site sont utilisées à des fins illustratives et proviennent de sources libres de droits disponibles sur internet.
+        </p>
       </div>
     </footer>
   )

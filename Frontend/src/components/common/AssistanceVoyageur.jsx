@@ -87,7 +87,7 @@ export default function AssistanceVoyageur({ numeroReservation, email, onFermer 
                   return (
                     <button key={bloc.categorie.code} onClick={() => setOngletActif(bloc.categorie.code)}
                       className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg border transition-colors ${
-                        actif ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        actif ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
                       }`}>
                       <Icone size={12} /> {bloc.categorie.nom} ({bloc.services.length})
                     </button>

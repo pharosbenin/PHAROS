@@ -851,14 +851,14 @@ function CarteReservation({ reservation, onConfirmerSejour, onModifier, onAnnule
 
           {['payee', 'confirmee', 'en_cours', 'confirme_hotel', 'confirme_client'].includes(reservation.statut) && (
             <Link to={`/client/reservation/${reservation.id}/restaurant`}
-              className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+              className="flex items-center gap-1.5 bg-orange-500 hover:bg-blue-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
               <Utensils size={12} /> Commander au restaurant
             </Link>
           )}
 
           {['payee', 'confirmee', 'en_cours', 'confirme_hotel', 'confirme_client', 'terminee'].includes(reservation.statut) && (
             <button onClick={() => setAssistanceOuverte(true)}
-              className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
+              className="flex items-center gap-1.5 bg-teal-600 hover:bg-orange-500 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors">
               <MapPin size={12} /> Mon Séjour
             </button>
           )}
