@@ -10,7 +10,11 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-pharos-2026-change-en
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
 _ALLOWED = os.environ.get('ALLOWED_HOSTS', '')
-ALLOWED_HOSTS = _ALLOWED.split(',') if _ALLOWED else ['localhost', '127.0.0.1', '*']
+# Le défaut incluait '*', qui accepte n'importe quel en-tête Host (risque
+# d'attaque par Host header injection). En production, ALLOWED_HOSTS doit
+# être défini explicitement via la variable d'environnement ; le défaut ne
+# couvre plus que le développement local.
+ALLOWED_HOSTS = _ALLOWED.split(',') if _ALLOWED else ['localhost', '127.0.0.1']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -91,6 +95,13 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.AnonRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '60/min',
+        'login': '5/min',
+    },
 }
 
 SIMPLE_JWT = {

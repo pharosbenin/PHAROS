@@ -1,7 +1,8 @@
 from rest_framework import status, generics
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import SimpleRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
@@ -15,8 +16,24 @@ from .serializers import (
 )
 
 
+class LoginRateThrottle(SimpleRateThrottle):
+    """
+    Limite les tentatives de connexion à 5/min par adresse IP, contre le
+    brute-force de mots de passe. DEFAULT_THROTTLE_RATES ne suffit pas seul
+    ici : ScopedRateThrottle lit view.throttle_scope, absent sur les vues
+    fonctions comme celle-ci — on applique donc ce throttle explicitement.
+    """
+    scope = 'login'
+    rate = '5/min'
+
+    def get_cache_key(self, request, view):
+        ident = self.get_ident(request)
+        return self.cache_format % {'scope': self.scope, 'ident': ident}
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([LoginRateThrottle])
 def connexion(request):
     from django.contrib.auth import authenticate
     username = request.data.get('username', '')

@@ -2,6 +2,7 @@ from django.db.models import Q
 from rest_framework import serializers
 from reservations.models import Reservation
 from .models import Avis, SignalementAvis, SignalementContenu, SignalementHotel
+from .moderation import contient_mot_interdit
 
 # Statuts qui ferment la fenêtre de signalement d'un hôtel : réservation pas encore payée,
 # ou déjà terminée/annulée/remboursée — il ne reste alors plus de séjour "en cours" à signaler.
@@ -57,6 +58,12 @@ class AvisCreerSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'reservation': "Vous ne pouvez laisser un avis qu'après votre séjour."})
         if Avis.objects.filter(client=request.user, hotel=attrs['hotel'], reservation=reservation).exists():
             raise serializers.ValidationError("Vous avez déjà laissé un avis pour cet hôtel.")
+        # Vérification serveur du commentaire, en plus du filtre côté client
+        # (utile pour le confort mais contournable via un appel direct à l'API).
+        if contient_mot_interdit(attrs.get('commentaire', '')):
+            raise serializers.ValidationError(
+                {'commentaire': "Votre commentaire contient des termes inappropriés."}
+            )
         return attrs
 
     def create(self, validated_data):
