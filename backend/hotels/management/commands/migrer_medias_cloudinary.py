@@ -45,12 +45,20 @@ class Command(BaseCommand):
                         introuvables += 1
                         continue
 
-                    with open(chemin_local, 'rb') as f:
-                        nom_fichier = Path(valeur.name).name
-                        valeur.save(nom_fichier, File(f), save=True)
+                    try:
+                        with open(chemin_local, 'rb') as f:
+                            nom_fichier = Path(valeur.name).name
+                            valeur.save(nom_fichier, File(f), save=True)
+                    except Exception as exc:
+                        self.stdout.write(self.style.ERROR(
+                            f"Échec : {model.__name__}#{instance.pk}.{champ.name} -> {exc}"
+                        ))
+                        deja_absents += 1
+                        continue
                     migres += 1
                     self.stdout.write(f"Migré : {model.__name__}#{instance.pk}.{champ.name}")
 
         self.stdout.write(self.style.SUCCESS(
-            f"Terminé. {migres} fichier(s) migré(s), {introuvables} introuvable(s) en local."
+            f"Terminé. {migres} fichier(s) migré(s), {introuvables} introuvable(s) en local, "
+            f"{deja_absents} échec(s) d'upload."
         ))
