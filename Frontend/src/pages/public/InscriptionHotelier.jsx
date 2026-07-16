@@ -7,6 +7,7 @@ import {
   AlertCircle, Percent, Clock, Info, Camera, Globe
 } from 'lucide-react'
 import Layout from '../../components/common/Layout'
+import { criteresMotDePasse, motDePasseEstSolide, MESSAGE_MOT_DE_PASSE_FAIBLE } from '../../utils/motDePasse'
 import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -344,8 +345,8 @@ export default function InscriptionHotelier() {
         setErreur('Le numéro de téléphone doit contenir 10 chiffres et commencer par 01.')
         return false
       }
-      if (compte.password.length < 8) {
-        setErreur('Le mot de passe doit contenir au moins 8 caractères.')
+      if (!motDePasseEstSolide(compte.password)) {
+        setErreur(MESSAGE_MOT_DE_PASSE_FAIBLE)
         return false
       }
       if (compte.password !== compte.confirmPassword) {
@@ -696,24 +697,31 @@ export default function InscriptionHotelier() {
                   <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input type={showPassword ? 'text' : 'password'} value={compte.password}
                     onChange={e => setC('password', e.target.value)}
-                    placeholder="Minimum 8 caractères"
+                    placeholder="8+ caractères, Maj, min, chiffre, spécial"
                     className="w-full border border-gray-200 rounded-xl pl-10 pr-10 py-3 text-sm outline-none focus:border-blue-400 transition-colors" />
                   <button type="button" onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
-                {compte.password && (
-                  <div className="flex gap-1 mt-1.5">
-                    {[...Array(4)].map((_, i) => (
-                      <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${
-                        compte.password.length >= (i + 1) * 2
-                          ? compte.password.length >= 8 ? 'bg-green-400' : 'bg-amber-400'
-                          : 'bg-gray-200'
-                      }`} />
-                    ))}
-                  </div>
-                )}
+                {compte.password && (() => {
+                  const c = criteresMotDePasse(compte.password)
+                  return (
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+                      {[
+                        [c.longueur, '8+ caractères'],
+                        [c.majuscule, 'Majuscule'],
+                        [c.minuscule, 'Minuscule'],
+                        [c.chiffre, 'Chiffre'],
+                        [c.special, 'Caractère spécial'],
+                      ].map(([ok, label]) => (
+                        <span key={label} className={`text-[11px] font-medium ${ok ? 'text-green-600' : 'text-gray-400'}`}>
+                          {ok ? '✓' : '·'} {label}
+                        </span>
+                      ))}
+                    </div>
+                  )
+                })()}
               </div>
 
               <div>

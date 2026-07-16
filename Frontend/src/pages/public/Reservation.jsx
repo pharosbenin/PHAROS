@@ -4,6 +4,7 @@ import { Trash2, Plus, Minus, ChevronLeft, User, Mail, Phone, AlertCircle, Build
 import Layout from '../../components/common/Layout'
 import api from '../../services/api'
 import { useAuth } from '../../context/AuthContext'
+import { motDePasseEstSolide, MESSAGE_MOT_DE_PASSE_FAIBLE } from '../../utils/motDePasse'
 
 const BACKEND_URL = 'http://localhost:8000'
 function mediaUrl(path) {
@@ -140,8 +141,8 @@ export default function Reservation() {
       setErreurDates('Numéro de téléphone invalide. 10 chiffres requis, commençant par 01 (ex: 0197000000).')
       return
     }
-    if (creerCompte && motDePasse.length < 8) {
-      setErreurDates('Le mot de passe doit contenir au moins 8 caractères.')
+    if (creerCompte && !motDePasseEstSolide(motDePasse)) {
+      setErreurDates(MESSAGE_MOT_DE_PASSE_FAIBLE)
       return
     }
 
@@ -585,7 +586,7 @@ export default function Reservation() {
                               type={showPassword ? 'text' : 'password'}
                               value={motDePasse}
                               onChange={e => setMotDePasse(e.target.value)}
-                              placeholder="Minimum 8 caractères"
+                              placeholder="8+ car., Maj, min, chiffre, spécial"
                               className="w-full border border-gray-200 rounded-xl pl-9 pr-10 py-2.5 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-50 transition-all"
                             />
                             <button type="button" onClick={() => setShowPassword(v => !v)}

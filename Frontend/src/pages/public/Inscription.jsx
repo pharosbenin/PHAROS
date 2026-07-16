@@ -4,6 +4,7 @@ import { Eye, EyeOff, Mail, Lock, User, Phone, Building2, ChevronRight, AlertCir
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
 import Layout from '../../components/common/Layout'
+import { criteresMotDePasse, motDePasseEstSolide, MESSAGE_MOT_DE_PASSE_FAIBLE } from '../../utils/motDePasse'
 
 export default function Inscription() {
   const navigate = useNavigate()
@@ -34,8 +35,8 @@ export default function Inscription() {
       setErreur('Le numéro de téléphone doit contenir 10 chiffres et commencer par 01.')
       return
     }
-    if (form.password.length < 8) {
-      setErreur('Le mot de passe doit contenir au moins 8 caractères')
+    if (!motDePasseEstSolide(form.password)) {
+      setErreur(MESSAGE_MOT_DE_PASSE_FAIBLE)
       return
     }
     setChargement(true)
@@ -162,7 +163,7 @@ export default function Inscription() {
                   type={showPassword ? 'text' : 'password'}
                   value={form.password}
                   onChange={e => setChamp('password', e.target.value)}
-                  placeholder="Minimum 8 caractères"
+                  placeholder="8+ caractères, Maj, min, chiffre, spécial"
                   className="w-full border border-gray-200 rounded-xl pl-10 pr-10 py-3 text-sm outline-none focus:border-blue-400"
                   required
                 />
@@ -171,17 +172,24 @@ export default function Inscription() {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-              {form.password && (
-                <div className="flex gap-1 mt-1.5">
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${
-                      form.password.length >= (i + 1) * 2
-                        ? form.password.length >= 8 ? 'bg-green-400' : 'bg-amber-400'
-                        : 'bg-gray-200'
-                    }`} />
-                  ))}
-                </div>
-              )}
+              {form.password && (() => {
+                const c = criteresMotDePasse(form.password)
+                return (
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+                    {[
+                      [c.longueur, '8+ caractères'],
+                      [c.majuscule, 'Majuscule'],
+                      [c.minuscule, 'Minuscule'],
+                      [c.chiffre, 'Chiffre'],
+                      [c.special, 'Caractère spécial'],
+                    ].map(([ok, label]) => (
+                      <span key={label} className={`text-[11px] font-medium ${ok ? 'text-green-600' : 'text-gray-400'}`}>
+                        {ok ? '✓' : '·'} {label}
+                      </span>
+                    ))}
+                  </div>
+                )
+              })()}
             </div>
 
             {erreur && (

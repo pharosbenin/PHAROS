@@ -11,6 +11,7 @@ import SidebarClient from '../../components/common/SidebarClient'
 import AssistanceVoyageur from '../../components/common/AssistanceVoyageur'
 import { useAuth } from '../../context/AuthContext'
 import api from '../../services/api'
+import { motDePasseEstSolide, MESSAGE_MOT_DE_PASSE_FAIBLE } from '../../utils/motDePasse'
 
 const STATUTS = {
   en_attente: { label: 'En attente', couleur: 'bg-gray-100 text-gray-400', icon: Clock },
@@ -471,7 +472,7 @@ function ModalChangerMotDePasse({ onFermer, onSucces }) {
 
   const handleConfirmer = async () => {
     if (!ancien || !nouveau || !confirmer) { setErreur('Tous les champs sont requis.'); return }
-    if (nouveau.length < 8) { setErreur('Le nouveau mot de passe doit contenir au moins 8 caractères.'); return }
+    if (!motDePasseEstSolide(nouveau)) { setErreur(MESSAGE_MOT_DE_PASSE_FAIBLE); return }
     if (nouveau !== confirmer) { setErreur('Les mots de passe ne correspondent pas.'); return }
     setEnvoi(true)
     setErreur('')
